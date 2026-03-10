@@ -4,3 +4,6 @@ export type * from './approval.js';
 export type * from './attachment.js';
 export type * from './audit-log.js';
 export type * from './api.js';
+export type * from './ai.js';
+export type * from './insight.js';
+export type * from './mcp.js';
