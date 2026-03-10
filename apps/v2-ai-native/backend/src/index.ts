@@ -43,7 +43,7 @@ app.route('/api/dashboard', dashboardRouter);
 app.route('/api/mock', mockRouter);
 
 // 启动
-const port = Number(process.env.PORT ?? 3002);
+const port = Number(process.env.PORT ?? 3102);
 
 console.log(`V2 AI-Native Backend starting on port ${port}...`);
 

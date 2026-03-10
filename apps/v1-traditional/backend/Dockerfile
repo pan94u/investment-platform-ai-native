@@ -32,5 +32,5 @@ COPY --from=builder /app/apps/v1-traditional/backend/dist ./apps/v1-traditional/
 COPY --from=builder /app/apps/v1-traditional/backend/package.json ./apps/v1-traditional/backend/package.json
 COPY --from=builder /app/apps/v1-traditional/backend/node_modules ./apps/v1-traditional/backend/node_modules
 
-EXPOSE 3001
+EXPOSE 3101
 CMD ["node", "apps/v1-traditional/backend/dist/index.js"]

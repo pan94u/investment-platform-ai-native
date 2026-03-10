@@ -63,7 +63,7 @@ app.route('/api/security', securityRouter);
 // 启动
 // ---------------------------------------------------------------------------
 
-const port = Number(process.env.PORT ?? 3006);
+const port = Number(process.env.PORT ?? 3106);
 
 console.log(`V4 Synapse MCP Server starting on port ${port}...`);
 console.log('Security features: Input Sanitization | Output Validation | RBAC | Audit Log | Human Boundary | Risk Transparency');

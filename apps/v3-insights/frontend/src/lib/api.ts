@@ -59,13 +59,31 @@ export const api = {
     request<Record<string, unknown>>(`/approvals/${id}/reject`, { method: 'POST', body: JSON.stringify({ comment }) }),
 
   // Insights - Dashboard
-  getDashboard: () => request<{
-    overview: { totalFilings: number; totalAmount: number; pendingApprovals: number; avgApprovalHours: number };
-    byType: Array<{ type: string; count: number; amount: number }>;
-    byDomain: Array<{ domain: string; count: number; amount: number }>;
-    byMonth: Array<{ month: string; count: number; amount: number }>;
-    byStatus: Array<{ status: string; count: number }>;
-  }>('/insights/dashboard'),
+  getDashboard: async () => {
+    const raw = await request<{
+      totalFilings: number;
+      totalAmount: number;
+      pendingCount: number;
+      avgApprovalHours: number;
+      byType: Record<string, number>;
+      byDomain: Record<string, number>;
+      byMonth: Array<{ month: string; count: number; amount: number }>;
+      byStatus: Record<string, number>;
+    }>('/insights/dashboard');
+    // Transform backend flat structure to frontend expected shape
+    return {
+      overview: {
+        totalFilings: raw.totalFilings,
+        totalAmount: raw.totalAmount,
+        pendingApprovals: raw.pendingCount,
+        avgApprovalHours: Math.round(raw.avgApprovalHours * 10) / 10,
+      },
+      byType: Object.entries(raw.byType).map(([type, count]) => ({ type, count, amount: 0 })),
+      byDomain: Object.entries(raw.byDomain).map(([domain, count]) => ({ domain, count, amount: 0 })),
+      byMonth: raw.byMonth,
+      byStatus: Object.entries(raw.byStatus).map(([status, count]) => ({ status, count })),
+    };
+  },
 
   // Insights - Trends
   getTrends: () => request<{
@@ -74,26 +92,46 @@ export const api = {
   }>('/insights/trends'),
 
   // Insights - Anomalies
-  getAnomalies: () => request<Array<{
-    id: string;
-    type: string;
-    severity: 'info' | 'warning' | 'critical';
-    title: string;
-    description: string;
-    relatedFilings: string[];
-    detectedAt: string;
-  }>>('/insights/anomalies'),
+  getAnomalies: async () => {
+    const raw = await request<{
+      anomalies: Array<{
+        id: string;
+        type: string;
+        severity: 'info' | 'warning' | 'critical';
+        title: string;
+        description: string;
+        relatedFilings: string[];
+        metric?: string;
+        threshold?: number;
+        actual?: number;
+      }>;
+    }>('/insights/anomalies');
+    return raw.anomalies.map((a) => ({
+      ...a,
+      detectedAt: new Date().toISOString(),
+    }));
+  },
 
   // Insights - Warnings
-  getWarnings: () => request<Array<{
-    id: string;
-    rule: string;
-    severity: 'warning' | 'critical';
-    message: string;
-    details: string;
-    filingIds: string[];
-    createdAt: string;
-  }>>('/insights/warnings'),
+  getWarnings: async () => {
+    const raw = await request<Array<{
+      id: string;
+      rule: string;
+      level: 'warning' | 'critical';
+      message: string;
+      details: Record<string, unknown> | string;
+      triggeredAt: string;
+    }>>('/insights/warnings');
+    return raw.map((w) => ({
+      id: w.id,
+      rule: w.rule,
+      severity: w.level,
+      message: w.message,
+      details: typeof w.details === 'string' ? w.details : JSON.stringify(w.details),
+      filingIds: [] as string[],
+      createdAt: w.triggeredAt,
+    }));
+  },
 
   // Insights - Project History
   getProjectHistory: (projectName: string) => request<{
@@ -103,27 +141,42 @@ export const api = {
   }>(`/insights/project/${encodeURIComponent(projectName)}`),
 
   // Insights - AI Insights
-  getInsights: () => request<Array<{
-    id: string;
-    type: 'trend' | 'anomaly' | 'warning' | 'recommendation';
-    severity: 'info' | 'warning' | 'critical';
-    title: string;
-    description: string;
-    data?: Record<string, unknown>;
-    createdAt: string;
-  }>>('/insights'),
+  getInsights: async () => {
+    const raw = await request<Array<{
+      id: string;
+      type: string;
+      severity: 'info' | 'warning' | 'critical';
+      title: string;
+      description: string;
+      data?: Record<string, unknown>;
+      generatedAt: string;
+    }>>('/insights');
+    return raw.map((i) => ({
+      ...i,
+      type: i.type as 'trend' | 'anomaly' | 'warning' | 'recommendation',
+      createdAt: i.generatedAt,
+    }));
+  },
 
   // Insights - Query
-  query: (question: string) =>
-    request<{
+  query: async (question: string) => {
+    const raw = await request<{
+      query: string;
       answer: string;
       confidence: number;
-      records?: Array<Record<string, unknown>>;
+      data?: Array<Record<string, unknown>>;
       suggestions?: string[];
     }>('/insights/query', {
       method: 'POST',
       body: JSON.stringify({ question }),
-    }),
+    });
+    return {
+      answer: raw.answer,
+      confidence: raw.confidence,
+      records: raw.data,
+      suggestions: raw.suggestions,
+    };
+  },
 
   // Reports
   getWeeklyReport: () => request<{

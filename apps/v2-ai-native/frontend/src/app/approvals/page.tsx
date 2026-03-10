@@ -89,16 +89,26 @@ export default function ApprovalsPage() {
         // Fetch AI summaries for each item in parallel
         for (const item of items) {
           try {
-            const [summary, risk] = await Promise.all([
+            const [summaryResult, risk] = await Promise.all([
               api.aiSummary(item.filingId).catch(() => null),
               api.aiRiskAssess(item.filingId).catch(() => null),
             ]);
+            // Map nested response to flat AISummary
+            const aiSummary: AISummary | null = summaryResult ? {
+              filingId: item.filingId,
+              oneLiner: summaryResult.summary.oneLiner,
+              keyPoints: summaryResult.summary.keyPoints,
+              riskHighlights: summaryResult.summary.riskHighlights,
+              attachmentSummary: summaryResult.summary.attachmentSummary,
+              suggestedOpinion: summaryResult.opinionSuggestion,
+              historicalContext: summaryResult.summary.historicalContext,
+            } : null;
             setTodos((prev) =>
               prev.map((t) =>
                 t.approvalId === item.approvalId
                   ? {
                       ...t,
-                      aiSummary: summary as AISummary | null,
+                      aiSummary,
                       riskResult: risk as RiskResult | null,
                       aiLoading: false,
                     }

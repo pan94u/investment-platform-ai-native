@@ -76,9 +76,9 @@ export const api = {
   aiChat: (conversationId: string, message: string, attachmentName?: string) =>
     request<{
       conversationId: string;
-      reply: string;
-      filingPreview: Record<string, unknown> | null;
-      fieldSources: Record<string, { source: string; confidence: number }> | null;
+      message: { id: string; role: string; content: string; timestamp: string; metadata?: Record<string, unknown> };
+      prefill: { fields: Record<string, unknown>; fieldSources: Record<string, { source: string; confidence: number }>; confidence: number; explanation: string } | null;
+      documentExtraction: unknown | null;
     }>('/ai/chat', {
       method: 'POST',
       body: JSON.stringify({ conversationId, message, attachmentName }),
@@ -106,13 +106,21 @@ export const api = {
 
   aiSummary: (filingId: string) =>
     request<{
-      filingId: string;
-      oneLiner: string;
-      keyPoints: string[];
-      riskHighlights: string[];
-      attachmentSummary: string | null;
-      suggestedOpinion: string;
-      historicalContext: Array<{ filingNumber: string; type: string; date: string; summary: string }>;
+      summary: {
+        oneLiner: string;
+        keyPoints: string[];
+        riskHighlights: string[];
+        attachmentSummary: string | null;
+        historicalContext: Array<{ filingNumber: string; type: string; date: string; summary: string }>;
+      };
+      riskAssessment: {
+        filingId: string;
+        level: 'low' | 'medium' | 'high';
+        score: number;
+        factors: Array<{ dimension: string; signal: string; value: string; description: string; weight: number }>;
+        recommendation: string;
+      };
+      opinionSuggestion: string;
     }>(`/ai/summary/${filingId}`),
 
   aiBaselineCheck: (fields: Record<string, unknown>) =>
@@ -121,7 +129,7 @@ export const api = {
       checks: Array<{ rule: string; passed: boolean; message: string }>;
     }>('/ai/baseline-check', {
       method: 'POST',
-      body: JSON.stringify({ fields }),
+      body: JSON.stringify(fields),
     }),
 
   aiQuery: (question: string) =>

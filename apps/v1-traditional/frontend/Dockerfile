@@ -19,7 +19,7 @@ COPY packages/shared ./packages/shared
 COPY packages/database ./packages/database
 COPY packages/ui ./packages/ui
 COPY apps/v1-traditional/frontend ./apps/v1-traditional/frontend
-ENV NEXT_PUBLIC_API_URL=http://backend:3001
+ENV NEXT_PUBLIC_API_URL=http://backend:3101
 RUN pnpm --filter @filing/shared build && pnpm --filter @filing/v1-frontend build
 
 FROM node:20-alpine AS runner
@@ -29,5 +29,5 @@ COPY --from=builder /app/apps/v1-traditional/frontend/.next/standalone ./
 COPY --from=builder /app/apps/v1-traditional/frontend/.next/static ./apps/v1-traditional/frontend/.next/static
 COPY --from=builder /app/apps/v1-traditional/frontend/public ./apps/v1-traditional/frontend/public
 
-EXPOSE 3000
+EXPOSE 3100
 CMD ["node", "apps/v1-traditional/frontend/server.js"]

@@ -32,7 +32,7 @@ app.route('/api/mock', mockRouter);
 app.route('/api/dashboard', dashboardRouter);
 
 // 启动
-const port = Number(process.env.PORT ?? 3001);
+const port = Number(process.env.PORT ?? 3101);
 
 console.log(`V1 Traditional Backend starting on port ${port}...`);
 

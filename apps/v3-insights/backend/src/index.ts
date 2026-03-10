@@ -42,7 +42,7 @@ app.route('/api/insights', insightsRouter);
 app.route('/api/mock', mockRouter);
 
 // 启动
-const port = Number(process.env.PORT ?? 3004);
+const port = Number(process.env.PORT ?? 3104);
 
 console.log(`V3 Insights Backend starting on port ${port}...`);
 

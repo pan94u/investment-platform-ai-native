@@ -128,14 +128,14 @@ export default function ChatPage() {
       const aiMsg: ChatMsg = {
         id: genId(),
         role: 'assistant',
-        content: result.reply,
+        content: result.message.content,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, aiMsg]);
 
-      if (result.filingPreview) {
-        setFilingPreview(result.filingPreview as FilingPreview);
-        setFieldSources(result.fieldSources ?? {});
+      if (result.prefill?.fields) {
+        setFilingPreview(result.prefill.fields as FilingPreview);
+        setFieldSources(result.prefill.fieldSources ?? {});
         // Reset checks when preview changes
         setRiskResult(null);
         setBaselineResult(null);
