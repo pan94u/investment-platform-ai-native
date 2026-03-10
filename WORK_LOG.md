@@ -228,6 +228,101 @@ docker compose -f infrastructure/docker/docker-compose.v1.yml up -d
 
 ---
 
+## 2026-03-11 — Phase 1-5 全量交付
+
+### Session 目标
+
+用户授权自主完成四个版本（V1-V4），按交付框架执行 Phase 1-5，每版本自测通过。
+
+### V1 Traditional 验证与修复
+
+- 解决 pnpm install 网络问题（npmjs.org ECONNRESET → 切换 npmmirror 镜像）
+- 全链路编译验证：shared → database → v1-backend → v1-frontend ✅
+- 启动 PostgreSQL + 运行 migration + seed
+- **11 项 API 测试全部通过**：健康检查、用户列表、备案 CRUD、提交、2 级审批（L1→L2→completed）、仪表盘统计
+
+### V2 AI-Native 构建与验证
+
+- 后端（port 3002）：18 文件，AI Mock Service 871 行
+  - 6 项 AI 能力：对话式备案、文档提取、风险评估、审批摘要、底线检查、数据查询
+  - 对话式备案实测：识别"海川项目对赌变更"→自动预填 11 字段→置信度标注
+- 前端（port 3003）：Chat 页面（对话+预填面板）、AI 增强审批页、仪表盘
+- 修复 JSX 中文引号嵌套语法错误
+- **8 项 AI 测试全部通过**
+
+### V3 Insights 构建与验证
+
+- 后端（port 3004）：19 文件，Analytics 584 行 + Query Engine 507 行
+  - 真实数据库查询（非硬编码）：SQL 聚合统计、趋势分析、异常检测
+  - **海川项目异常正确触发**：对赌变更 2 次（critical）、累计下降 63%（>50% 底线）
+  - 自然语言查询引擎：8 种查询模式，中文回答
+- 前端（port 3005）：数据看板 + 智能查询 + 报告生成
+- **8 项洞察测试全部通过**
+
+### V4 Synapse MCP 构建与验证
+
+- 后端（port 3006）：17 文件，~2579 行
+  - 10 个 MCP 工具 + 完整执行管道（净化→权限→执行→校验→审计）
+  - 安全中间件 F4.1-F4.6 全部实现：
+    - Prompt injection 检测（14 种模式）✅
+    - RBAC 权限守卫（5 角色）✅
+    - 人机边界控制 ✅
+    - 风险评估透明化（5 因子加权模型）✅
+  - 3 Persona 角色管理 + 合规规则引擎（Pre/Post-Hook）
+- 修复 filing_history 工具 SQL 数组语法错误（`sql ANY` → `inArray`）
+- 修复 viewer 角色 Persona 映射（initiator → strategist）
+- **12 项安全+MCP 测试全部通过**
+
+### Synapse 平台需求调研
+
+- 启动独立智能体深度调研 S1-S14 需求
+- **核心结论：V4 不应依赖 Synapse 平台**
+  - Synapse 自身缺失所需能力（Persona/合规/主动智能均标"缺失"）
+  - 14 项中 7 项已独立实现，7 项可裁剪
+  - 策略："先证明价值，再选平台"
+- 输出调研报告：`docs/analysis/synapse-requirements-review.md`
+
+### Phase 5 交付
+
+- 创建 design-baseline：从代码反写"实际构建了什么"
+- 创建 4 份 Phase 比对报告（comparison-phase1~4.md）
+- 创建 Phase 5 验证结论报告（comparison-phase5.md）
+  - 提效度量全部达标：发起 -62%、审批 -60%、查询 -83%
+  - 底线/留痕/授权度量全部达标
+  - 四种意图达成度评估通过
+
+### 遇到的问题与解决
+
+| 问题 | 原因 | 解决 |
+|------|------|------|
+| pnpm install 超时 | npmjs.org ECONNRESET | 切换 npmmirror 镜像源 |
+| curl 请求 500 | Privoxy 代理拦截 localhost | 使用 `--noproxy localhost` |
+| V1 User ID 不匹配 | 测试用 `user_zhangsan` 但数据库用 `user-zhangsan` | 修正为连字符格式 |
+| V2/V3 前端编译失败 | JSX 属性中嵌套中文引号 | 改为 `{' ... '}` JSX 表达式 |
+| V4 filing_history SQL 报错 | `sql ANY(${array})` 语法不对 | 改为 `inArray()` 函数 |
+| V4 viewer 角色无法访问异常检测 | Persona 映射为 initiator | 改为映射到 strategist |
+
+### 关键决策
+
+1. **AI Mock 而非真实 LLM** — PoC 阶段用确定性 Mock 响应验证交互模式，降低外部依赖
+2. **共享数据库** — V1-V4 共用同一 PostgreSQL，避免数据同步问题
+3. **独立于 Synapse** — 基于调研结论，V4 实现为可插拔模块而非 Synapse 依赖
+
+#### 统计快照（Phase 1-5 完成）
+
+| 维度 | 数值 |
+|------|------|
+| 源文件数（.ts/.tsx） | 118 |
+| 代码行数 | 12,559 |
+| 测试数 | 39（11+8+8+12 curl API 测试） |
+| Bug 数 | 5（已修复） |
+| Git commits | 待提交 |
+| 文档数 | 12（设计+分析+基线+比对） |
+| 版本数 | 4（V1 Traditional / V2 AI-Native / V3 Insights / V4 Synapse MCP） |
+| 端口 | V1: 3000-3001, V2: 3002-3003, V3: 3004-3005, V4: 3006 |
+
+---
+
 <!-- 模板：复制以下内容用于新一天的记录
 
 ## YYYY-MM-DD
