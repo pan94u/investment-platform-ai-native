@@ -1,0 +1,79 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: filing-v1-postgres
+    environment:
+      POSTGRES_DB: filing_v1
+      POSTGRES_USER: filing
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-filing_dev}
+    volumes:
+      - v1-postgres-data:/var/lib/postgresql/data
+    ports:
+      - "${V1_DB_PORT:-5401}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U filing -d filing_v1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: apps/v1-traditional/backend/Dockerfile
+    container_name: filing-v1-backend
+    environment:
+      DATABASE_URL: postgresql://filing:${DB_PASSWORD:-filing_dev}@postgres:5432/filing_v1
+      PORT: "3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: apps/v1-traditional/frontend/Dockerfile
+    container_name: filing-v1-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:3001
+    depends_on:
+      backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+  nginx:
+    image: nginx:alpine
+    container_name: filing-v1-nginx
+    ports:
+      - "${V1_APP_PORT:-8001}:80"
+    volumes:
+      - ./nginx-v1.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 64M
+
+volumes:
+  v1-postgres-data:
