@@ -1,0 +1,20 @@
+{
+  "name": "investment-platform-ai-native",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "test": "turbo test",
+    "lint": "turbo lint",
+    "db:generate": "pnpm --filter @filing/database generate",
+    "db:migrate": "pnpm --filter @filing/database migrate",
+    "db:seed": "pnpm --filter @filing/database seed",
+    "db:studio": "pnpm --filter @filing/database studio",
+    "clean": "turbo clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.0"
+  }
+}

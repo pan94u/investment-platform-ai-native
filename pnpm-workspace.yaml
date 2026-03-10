@@ -1,0 +1,5 @@
+packages:
+  - "packages/*"
+  - "apps/*/frontend"
+  - "apps/*/backend"
+  - "apps/v4-synapse/mcp-server"
