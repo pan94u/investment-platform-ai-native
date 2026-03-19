@@ -3,6 +3,8 @@ import { filings, approvals, users } from '@filing/database';
 import type { CreateFilingRequest, UpdateFilingRequest, FilingQueryParams } from '@filing/shared';
 import { db } from '../lib/db.js';
 import { generateId, generateFilingNumber } from '../lib/id.js';
+import { getOrgProvider, getNotifyProvider } from '../providers/index.js';
+import * as auditService from './audit.js';
 
 /** 获取下一个备案序号 */
 async function getNextSeq(): Promise<number> {
@@ -16,7 +18,7 @@ async function getNextSeq(): Promise<number> {
 }
 
 /** 创建备案（草稿） */
-export async function createFiling(data: CreateFilingRequest, creatorId: string) {
+export async function createFiling(data: CreateFilingRequest, creatorId: string, creatorName: string) {
   const seq = await getNextSeq();
   const id = generateId('filing');
   const filingNumber = generateFilingNumber(seq);
@@ -42,11 +44,20 @@ export async function createFiling(data: CreateFilingRequest, creatorId: string)
     creatorId,
   }).returning();
 
+  await auditService.logAudit({
+    action: 'filing_created',
+    entityType: 'filing',
+    entityId: filing.id,
+    userId: creatorId,
+    userName: creatorName,
+    detail: { type: data.type, title: data.title, amount: data.amount },
+  });
+
   return filing;
 }
 
 /** 更新备案（仅草稿状态可编辑） */
-export async function updateFiling(id: string, data: UpdateFilingRequest, userId: string) {
+export async function updateFiling(id: string, data: UpdateFilingRequest, userId: string, userName: string) {
   const existing = await db.select().from(filings).where(eq(filings.id, id)).limit(1);
   if (existing.length === 0) throw new Error('备案不存在');
   if (existing[0].status !== 'draft') throw new Error('仅草稿状态可编辑');
@@ -69,16 +80,39 @@ export async function updateFiling(id: string, data: UpdateFilingRequest, userId
   if (data.changeReason !== undefined) updateData.changeReason = data.changeReason;
 
   const [updated] = await db.update(filings).set(updateData).where(eq(filings.id, id)).returning();
+
+  await auditService.logAudit({
+    action: 'filing_updated',
+    entityType: 'filing',
+    entityId: updated.id,
+    userId,
+    userName,
+    detail: { changes: data },
+  });
+
   return updated;
+}
+
+/** 将备案编号（BG20260313-001）或内部 ID（filing-xxx）统一解析为内部 ID */
+export async function resolveFilingId(idOrNumber: string): Promise<string | null> {
+  if (idOrNumber.startsWith('filing-')) return idOrNumber;
+  // 尝试按 filingNumber 查
+  if (/^BG\d{8}-\d+$/.test(idOrNumber)) {
+    const row = await db.select({ id: filings.id }).from(filings).where(eq(filings.filingNumber, idOrNumber)).limit(1);
+    return row[0]?.id ?? null;
+  }
+  return idOrNumber; // fallback — 原样传入，由后续查询报错
 }
 
 /** 获取单个备案详情 */
 export async function getFilingById(id: string) {
+  const resolvedId = await resolveFilingId(id);
+  if (!resolvedId) return null;
   const result = await db
     .select()
     .from(filings)
     .leftJoin(users, eq(filings.creatorId, users.id))
-    .where(eq(filings.id, id))
+    .where(eq(filings.id, resolvedId))
     .limit(1);
 
   if (result.length === 0) return null;
@@ -112,52 +146,73 @@ export async function queryFilings(params: FilingQueryParams) {
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
   const [data, totalResult] = await Promise.all([
-    db
-      .select()
-      .from(filings)
-      .where(where)
-      .orderBy(desc(filings.createdAt))
-      .limit(pageSize)
-      .offset(offset),
-    db
-      .select({ cnt: count() })
-      .from(filings)
-      .where(where),
+    db.select().from(filings).where(where).orderBy(desc(filings.createdAt)).limit(pageSize).offset(offset),
+    db.select({ cnt: count() }).from(filings).where(where),
   ]);
 
   const total = totalResult[0]?.cnt ?? 0;
 
-  return {
-    data,
-    total,
-    page,
-    pageSize,
-    totalPages: Math.ceil(total / pageSize),
-  };
+  return { data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
 }
 
-/** 提交备案（草稿→待上级审批） */
-export async function submitFiling(filingId: string, userId: string) {
+/** 提交备案（草稿→待审批），使用 OrgProvider 获取审批链 */
+export async function submitFiling(filingId: string, userId: string, userName: string) {
   const existing = await db.select().from(filings).where(eq(filings.id, filingId)).limit(1);
   if (existing.length === 0) throw new Error('备案不存在');
   if (existing[0].status !== 'draft') throw new Error('仅草稿状态可提交');
   if (existing[0].creatorId !== userId) throw new Error('无权提交此备案');
 
-  // 查找上级审批人（supervisor）
-  const supervisors = await db.select().from(users).where(eq(users.role, 'supervisor'));
-  if (supervisors.length === 0) throw new Error('未找到上级审批人');
+  const filing = existing[0];
+
+  // 获取创建人信息
+  const creatorRows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  const creator = creatorRows[0];
+
+  // 通过 OrgProvider 获取审批链（含同人捏合）
+  const orgProvider = getOrgProvider();
+  const chain = await orgProvider.getApproverChain({
+    creatorId: userId,
+    creatorDepartment: creator.department,
+    creatorDomain: creator.domain,
+    filingType: filing.type,
+    amount: filing.amount,
+  });
+
+  if (chain.length === 0) throw new Error('未找到审批人');
 
   const now = new Date();
+  const notifyProvider = getNotifyProvider();
 
-  // 创建一级审批记录
+  // 创建第一级审批
+  const approvalId = generateId('approval');
+  const firstApprover = chain[0];
+
   await db.insert(approvals).values({
-    id: generateId('approval'),
+    id: approvalId,
     filingId,
-    approverId: supervisors[0].id,
-    approverName: supervisors[0].name,
+    approverId: firstApprover.userId,
+    approverName: firstApprover.name,
     level: 1,
     status: 'pending',
   });
+
+  // 推送待办通知
+  const externalTodoId = await notifyProvider.pushTodo({
+    approvalId,
+    filingId,
+    filingTitle: filing.title,
+    filingNumber: filing.filingNumber,
+    approverUserId: firstApprover.userId,
+    approverName: firstApprover.name,
+    level: 1,
+    creatorName: userName,
+    amount: filing.amount,
+    filingType: filing.type,
+  });
+
+  if (externalTodoId) {
+    await db.update(approvals).set({ externalTodoId }).where(eq(approvals.id, approvalId));
+  }
 
   // 更新备案状态
   const [updated] = await db
@@ -165,6 +220,70 @@ export async function submitFiling(filingId: string, userId: string) {
     .set({ status: 'pending_level1', submittedAt: now, updatedAt: now })
     .where(eq(filings.id, filingId))
     .returning();
+
+  await auditService.logAudit({
+    action: 'filing_submitted',
+    entityType: 'filing',
+    entityId: filingId,
+    userId,
+    userName,
+    detail: { approverChainLength: chain.length, firstApprover: firstApprover.name },
+  });
+
+  return updated;
+}
+
+/** 撤回备案（发起人在审批未决前撤回） */
+export async function recallFiling(filingId: string, userId: string, userName: string) {
+  const existing = await db.select().from(filings).where(eq(filings.id, filingId)).limit(1);
+  if (existing.length === 0) throw new Error('备案不存在');
+
+  const filing = existing[0];
+  if (filing.status !== 'pending_level1' && filing.status !== 'pending_level2') {
+    throw new Error('仅待审批状态可撤回');
+  }
+  if (filing.creatorId !== userId) throw new Error('仅发起人可撤回');
+
+  // 检查是否有已决定的审批（已决定的不允许撤回）
+  const pendingApprovals = await db
+    .select()
+    .from(approvals)
+    .where(and(eq(approvals.filingId, filingId), eq(approvals.status, 'pending')));
+
+  if (pendingApprovals.length === 0) {
+    throw new Error('当前审批已被处理，无法撤回');
+  }
+
+  const now = new Date();
+  const notifyProvider = getNotifyProvider();
+
+  // 关闭所有 pending 审批
+  for (const approval of pendingApprovals) {
+    await db.update(approvals).set({
+      status: 'rejected',
+      comment: '发起人撤回',
+      decidedAt: now,
+    }).where(eq(approvals.id, approval.id));
+
+    if (approval.externalTodoId) {
+      await notifyProvider.closeTodo(approval.externalTodoId, 'recalled');
+    }
+  }
+
+  // 更新备案状态
+  const [updated] = await db
+    .update(filings)
+    .set({ status: 'recalled', updatedAt: now })
+    .where(eq(filings.id, filingId))
+    .returning();
+
+  await auditService.logAudit({
+    action: 'filing_recalled',
+    entityType: 'filing',
+    entityId: filingId,
+    userId,
+    userName,
+  });
 
   return updated;
 }

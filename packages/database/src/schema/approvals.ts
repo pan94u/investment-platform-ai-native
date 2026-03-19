@@ -12,4 +12,6 @@ export const approvals = pgTable('approvals', {
   comment: text('comment'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   decidedAt: timestamp('decided_at', { withTimezone: true }),
+  reassignedFrom: text('reassigned_from'),       // 改派前的原审批人 ID
+  externalTodoId: text('external_todo_id'),       // 飞书等外部系统的待办 ID
 });

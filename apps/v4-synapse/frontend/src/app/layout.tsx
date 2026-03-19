@@ -2,16 +2,14 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'V1 - 传统备案系统',
-  description: '投资项目备案管理系统（传统版）',
+  title: 'Synapse - 投资管理 AI 平台',
+  description: '基于 MCP 的 AI 原生投资管理平台',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN">
-      <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
-        {children}
-      </body>
+      <body className="bg-slate-50 text-slate-900 antialiased">{children}</body>
     </html>
   );
 }

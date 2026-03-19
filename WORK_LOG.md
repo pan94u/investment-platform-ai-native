@@ -323,6 +323,161 @@ docker compose -f infrastructure/docker/docker-compose.v1.yml up -d
 
 ---
 
+## 2026-03-13 — V1 审批流程升级
+
+### Session 目标
+
+实施审批流程升级计划，解决 5 个核心缺陷：同人审批、组织数据抽象、管理员改派、飞书待办、MCP 入口审计。
+
+### 设计决策
+
+1. **OrgProvider + NotifyProvider 双接口模式** — 用 Provider 模式解耦组织数据和通知渠道
+   - OrgProvider: 从本地 DB 查审批链，未来可换接外部组织中心
+   - NotifyProvider: Mock（PoC）/ 飞书（生产），失败不阻断审批流
+2. **审计日志沉入 Service 层** — 路由层不再写审计，MCP/Webhook 等多入口自动覆盖
+3. **同人捏合** — L1 === L2 时返回单元素审批链，一次审批即 completed
+
+### 实施内容
+
+**Phase A: 基础设施**
+- `packages/database/src/schema/approvals.ts` +2 列（reassignedFrom, externalTodoId）
+- `packages/shared/src/types/audit-log.ts` +3 AuditAction（recalled/reassigned/batch_approved）
+- `frontend/src/lib/constants.ts` +recalled 状态
+
+**Phase B: Provider 实现（4 个新文件）**
+- `providers/types.ts` — OrgProvider + NotifyProvider 接口定义
+- `providers/org-db.ts` — DatabaseOrgProvider（同人捏合逻辑）
+- `providers/notify-mock.ts` — MockNotifyProvider（console.log）
+- `providers/notify-feishu.ts` — FeishuNotifyProvider（飞书 Task V2 API）
+- `providers/index.ts` — 工厂，环境变量驱动选择
+
+**Phase C: Service 层重构**
+- `services/filing.ts` — submitFiling 用 OrgProvider, 新增 recallFiling
+- `services/approval.ts` — processApproval 重构 + reassignApproval + batchApprove
+- 所有审计日志从路由移入 Service
+
+**Phase D: Route + Webhook**
+- `middleware/require-role.ts` — 角色守卫中间件
+- `routes/filings.ts` — 移除路由层审计 + 新增 recall 端点
+- `routes/approvals.ts` — 新增 reassign + batch-approve 端点
+- `routes/webhooks.ts` — 飞书审批回调（新文件）
+- `index.ts` — 挂载 webhooks 路由
+
+**Phase E: 前端适配**
+- `api.ts` — +3 个 API 方法（recallFiling/reassignApproval/batchApproveApprovals）
+- `filings/[id]/page.tsx` — 撤回按钮（pending 状态 + creator 条件）
+- `approvals/page.tsx` — 批量审批勾选框 + 管理员改派面板
+
+### E2E 测试结果
+
+| 测试用例 | 结果 | 说明 |
+|----------|------|------|
+| TC-B1: 基本审批 L1→L2→completed | ✅ PASS | 状态机完整流转 |
+| TC-B2: 撤回（pending→recalled） | ✅ PASS | 撤回后状态正确 |
+| TC-B3: 撤回限制（completed 不可撤回） | ✅ PASS | 返回"仅待审批状态可撤回" |
+| TC-B4: 管理员改派 | ✅ PASS | 旧审批人失去待办，新审批人获得待办 |
+| TC-B5: 批量审批 | ✅ PASS | 3 条一次性通过，0 失败 |
+| TC-B6: 非管理员改派 → 403 | ✅ PASS | 返回"权限不足" |
+| TC-B7: 审计日志完整性 | ✅ PASS | 6 种审计动作全部记录 |
+| TC-B8: Webhook 审批 | ✅ PASS | 飞书回调端点可直接审批 |
+| TC-B9: 同人捏合 | ⏭️ SKIP | 单角色 schema 无法模拟，代码逻辑已 review |
+
+### 遇到的问题与解决
+
+| 问题 | 原因 | 解决 |
+|------|------|------|
+| drizzle-kit push 失败 | ESM .js 后缀在 CJS 加载器中报错 | 直接修改 migration SQL 加列 |
+| Backend 启动后 approvals 列不存在 | 旧 dist 包被缓存 | 重新 build database + backend 后重启 |
+| migration 静默"完成"但表未创建 | DATABASE_URL 默认端口 5432 ≠ Docker 映射 5401 | 显式指定 DATABASE_URL |
+
+### 关键文件清单
+
+| 操作 | 文件 | 说明 |
+|------|------|------|
+| 改 | `packages/database/src/schema/approvals.ts` | +2 列 |
+| 改 | `packages/shared/src/types/audit-log.ts` | +3 AuditAction |
+| 新 | `backend/src/providers/types.ts` | 接口定义 |
+| 新 | `backend/src/providers/org-db.ts` | DB 组织数据 |
+| 新 | `backend/src/providers/notify-mock.ts` | Mock 通知 |
+| 新 | `backend/src/providers/notify-feishu.ts` | 飞书通知 |
+| 新 | `backend/src/providers/index.ts` | 工厂 |
+| 新 | `backend/src/middleware/require-role.ts` | 角色守卫 |
+| 改 | `backend/src/services/filing.ts` | submitFiling 重构 + recallFiling |
+| 改 | `backend/src/services/approval.ts` | processApproval 重构 + reassign + batch |
+| 改 | `backend/src/routes/filings.ts` | 去审计 + recall |
+| 改 | `backend/src/routes/approvals.ts` | 去审计 + reassign + batch |
+| 新 | `backend/src/routes/webhooks.ts` | 飞书回调 |
+| 改 | `backend/src/index.ts` | 挂载 webhooks |
+| 改 | `frontend/src/lib/constants.ts` | recalled 状态 |
+| 改 | `frontend/src/lib/api.ts` | +3 API 方法 |
+| 改 | `frontend/src/app/filings/[id]/page.tsx` | 撤回按钮 |
+| 改 | `frontend/src/app/approvals/page.tsx` | 批量审批 + 改派 |
+
+#### 统计快照
+
+| 维度 | 数值 |
+|------|------|
+| V1 源文件数（.ts/.tsx） | 64 |
+| V1 代码行数 | 4,301 |
+| 新增文件 | 7 |
+| 修改文件 | 11 |
+| E2E 测试通过 | 8/9（1 skip） |
+| Bug 数 | 3（已修复） |
+
+---
+
+## 2026-03-19 — Synapse 集成修复 + 合规规则
+
+### Session 目标
+
+消除 Synapse 经 MCP 调用 V1 备案流程的摩擦，补齐关键操作的合规规则（前置人工批准 + 后置留痕）。
+
+### 问题诊断与修复
+
+**1. MCP Server 连接错误端口（3106 → 3101）**
+- **现象**: Synapse 中提交备案 422 错误，filing_submit 返回"必填字段缺失"
+- **根因**: Synapse 有两套 MCP 配置目录 — `config/mcp-servers/`（根模板）和 `packages/server/config/mcp-servers/`（实际加载），后者硬编码 `FILING_API_URL=http://localhost:3106`（旧端口）
+- **修复**: 更新 `packages/server/config/mcp-servers/investment-filing.json` 指向 3101
+
+**2. LLM 混淆备案编号与内部 ID（6 次连续失败）**
+- **现象**: LLM 反复用备案编号 `BG20260313-031` 调 filing_submit，而非内部 ID `filing-xxxx`
+- **修复 A — V1 后端**: 新增 `resolveFilingId()` 函数，同时接受备案编号和内部 ID
+- **修复 B — MCP 工具描述**: 所有 filingId 参数描述改为明确格式说明 `'备案内部ID（格式: filing-xxxx，不是备案编号 BG-xxx）'`
+- **修复范围**: filing_update, filing_submit, filing_recall, filing_get, filing_risk_assess 共 6 个工具
+
+### Synapse 合规规则（15 条）
+
+在 `config/compliance/rules/investment-filing.yaml` 新增完整合规规则集：
+
+**Pre-Hook 前置人工批准（7 条）**:
+1. `filing-amount-validation` — 备案金额校验（≥10 亿 CEO 审批，≥5 亿集团审批人关注）
+2. `filing-submit-approval` — 提交备案需确认
+3. `filing-recall-approval` — 撤回备案需确认
+4. `approval-approve-confirmation` — 审批通过需确认
+5. `approval-reject-confirmation` — 审批驳回需确认
+6. `approval-batch-confirmation` — 批量审批需确认
+7. `approval-reassign-confirmation` — 改派审批人需确认
+
+**Post-Hook 后置审计留痕（8 条）**:
+8~15. filing_create/update/submit/recall + approval_approve/reject/batch/reassign 全部留痕
+
+### 关键文件变更
+
+| 仓库 | 文件 | 变更 |
+|------|------|------|
+| V1 | `backend/src/services/filing.ts` | +resolveFilingId() 函数 |
+| V1 | `backend/src/mcp/tools.ts` | 6 个工具使用 resolveFilingId |
+| Synapse | `packages/server/config/mcp-servers/investment-filing.json` | 端口 3106→3101 |
+| Synapse | `packages/mcp-servers/src/investment-filing/index.ts` | filingId 描述优化 |
+| Synapse | `config/compliance/rules/investment-filing.yaml` | 15 条合规规则（7 pre + 8 post） |
+
+### 验证
+
+- Synapse Agent API 端到端测试：filing_submit 正确触发 `require_approval` 前置钩子 ✅
+- V1 后端 resolveFilingId 支持编号和 ID 两种格式 ✅
+
+---
+
 <!-- 模板：复制以下内容用于新一天的记录
 
 ## YYYY-MM-DD

@@ -14,6 +14,7 @@ export const STATUS_LABELS: Record<string, string> = {
   approved: '已通过',
   rejected: '已驳回',
   completed: '已完成',
+  recalled: '已撤回',
 };
 
 export const STATUS_COLORS: Record<string, string> = {
@@ -24,6 +25,7 @@ export const STATUS_COLORS: Record<string, string> = {
   approved: 'bg-green-100 text-green-700',
   rejected: 'bg-red-100 text-red-700',
   completed: 'bg-green-100 text-green-700',
+  recalled: 'bg-slate-100 text-slate-600',
 };
 
 export const DOMAIN_LABELS: Record<string, string> = {

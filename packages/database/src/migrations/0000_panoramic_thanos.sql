@@ -6,6 +6,8 @@ CREATE TABLE "approvals" (
 	"level" integer NOT NULL,
 	"status" varchar(20) DEFAULT 'pending' NOT NULL,
 	"comment" text,
+	"reassigned_from" text,
+	"external_todo_id" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"decided_at" timestamp with time zone
 );

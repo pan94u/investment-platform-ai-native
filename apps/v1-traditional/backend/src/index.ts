@@ -7,6 +7,8 @@ import { filingsRouter } from './routes/filings.js';
 import { approvalsRouter } from './routes/approvals.js';
 import { mockRouter } from './routes/mock.js';
 import { dashboardRouter } from './routes/dashboard.js';
+import { webhooksRouter } from './routes/webhooks.js';
+import { mcpRouter } from './routes/mcp.js';
 
 const app = new Hono();
 
@@ -30,6 +32,8 @@ app.route('/api/filings', filingsRouter);
 app.route('/api/approvals', approvalsRouter);
 app.route('/api/mock', mockRouter);
 app.route('/api/dashboard', dashboardRouter);
+app.route('/api/webhooks', webhooksRouter);
+app.route('/api/mcp', mcpRouter);
 
 // 启动
 const port = Number(process.env.PORT ?? 3101);

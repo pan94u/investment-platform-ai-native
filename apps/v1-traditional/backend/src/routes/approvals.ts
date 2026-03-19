@@ -1,17 +1,17 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../lib/types.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { requireRole } from '../middleware/require-role.js';
 import * as approvalService from '../services/approval.js';
-import * as auditService from '../services/audit.js';
 
 const approvalsRouter = new Hono<AppEnv>();
 
 approvalsRouter.use('/*', authMiddleware);
 
-/** GET /api/approvals/todos — 获取待审批列表 */
+/** GET /api/approvals/todos — 获取待审批列表（admin 可见全部） */
 approvalsRouter.get('/todos', async (c) => {
   const user = c.get('user');
-  const todos = await approvalService.getApprovalTodos(user.id);
+  const todos = await approvalService.getApprovalTodos(user.id, user.role === 'admin');
   return c.json({ success: true, data: todos, error: null });
 });
 
@@ -27,17 +27,7 @@ approvalsRouter.post('/:id/approve', async (c) => {
   const body = await c.req.json<{ comment?: string }>().catch(() => ({} as { comment?: string }));
 
   try {
-    const result = await approvalService.processApproval(c.req.param('id'), user.id, 'approve', body.comment);
-
-    await auditService.logAudit({
-      action: 'filing_approved',
-      entityType: 'approval',
-      entityId: c.req.param('id'),
-      userId: user.id,
-      userName: user.name,
-      detail: { comment: body.comment },
-    });
-
+    const result = await approvalService.processApproval(c.req.param('id'), user.id, 'approve', body.comment, user.name);
     return c.json({ success: true, data: result, error: null });
   } catch (err) {
     const message = err instanceof Error ? err.message : '审批失败';
@@ -51,20 +41,48 @@ approvalsRouter.post('/:id/reject', async (c) => {
   const body = await c.req.json<{ comment?: string }>().catch(() => ({} as { comment?: string }));
 
   try {
-    const result = await approvalService.processApproval(c.req.param('id'), user.id, 'reject', body.comment);
-
-    await auditService.logAudit({
-      action: 'filing_rejected',
-      entityType: 'approval',
-      entityId: c.req.param('id'),
-      userId: user.id,
-      userName: user.name,
-      detail: { comment: body.comment },
-    });
-
+    const result = await approvalService.processApproval(c.req.param('id'), user.id, 'reject', body.comment, user.name);
     return c.json({ success: true, data: result, error: null });
   } catch (err) {
     const message = err instanceof Error ? err.message : '驳回失败';
+    return c.json({ success: false, data: null, error: message }, 400);
+  }
+});
+
+/** PUT /api/approvals/:id/reassign — 管理员改派 */
+approvalsRouter.put('/:id/reassign', requireRole('admin'), async (c) => {
+  const user = c.get('user');
+  const body = await c.req.json<{ newApproverId: string; reason?: string }>();
+
+  if (!body.newApproverId) {
+    return c.json({ success: false, data: null, error: '缺少新审批人 ID' }, 400);
+  }
+
+  try {
+    const result = await approvalService.reassignApproval(
+      c.req.param('id'), user.id, user.name, body.newApproverId, body.reason,
+    );
+    return c.json({ success: true, data: result, error: null });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '改派失败';
+    return c.json({ success: false, data: null, error: message }, 400);
+  }
+});
+
+/** POST /api/approvals/batch-approve — 批量审批 */
+approvalsRouter.post('/batch-approve', async (c) => {
+  const user = c.get('user');
+  const body = await c.req.json<{ approvalIds: string[]; comment?: string }>();
+
+  if (!body.approvalIds?.length) {
+    return c.json({ success: false, data: null, error: '缺少审批 ID 列表' }, 400);
+  }
+
+  try {
+    const result = await approvalService.batchApprove(body.approvalIds, user.id, user.name, body.comment);
+    return c.json({ success: true, data: result, error: null });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '批量审批失败';
     return c.json({ success: false, data: null, error: message }, 400);
   }
 });

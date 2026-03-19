@@ -4,6 +4,7 @@ import type { AppEnv } from '../lib/types.js';
 import { authMiddleware } from '../middleware/auth.js';
 import * as filingService from '../services/filing.js';
 import * as auditService from '../services/audit.js';
+import { getOrgProvider } from '../providers/index.js';
 
 const filingsRouter = new Hono<AppEnv>();
 
@@ -18,17 +19,7 @@ filingsRouter.post('/', async (c) => {
     return c.json({ success: false, data: null, error: '缺少必填字段' }, 400);
   }
 
-  const filing = await filingService.createFiling(body, user.id);
-
-  await auditService.logAudit({
-    action: 'filing_created',
-    entityType: 'filing',
-    entityId: filing.id,
-    userId: user.id,
-    userName: user.name,
-    detail: { type: body.type, title: body.title, amount: body.amount },
-  });
-
+  const filing = await filingService.createFiling(body, user.id, user.name);
   return c.json({ success: true, data: filing, error: null }, 201);
 });
 
@@ -50,6 +41,29 @@ filingsRouter.get('/', async (c) => {
   return c.json({ success: true, data: result, error: null });
 });
 
+/** GET /api/filings/approval-chain-preview — 预览审批链 */
+filingsRouter.get('/approval-chain-preview', async (c) => {
+  const user = c.get('user');
+  const domain = c.req.query('domain') || user.domain;
+  const filingType = c.req.query('filingType') || 'direct_investment';
+  const amount = c.req.query('amount') || '0';
+
+  try {
+    const orgProvider = getOrgProvider();
+    const chain = await orgProvider.getApproverChain({
+      creatorId: user.id,
+      creatorDepartment: user.department,
+      creatorDomain: domain,
+      filingType,
+      amount,
+    });
+    return c.json({ success: true, data: chain, error: null });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '获取审批链失败';
+    return c.json({ success: false, data: null, error: message }, 400);
+  }
+});
+
 /** GET /api/filings/:id — 获取备案详情 */
 filingsRouter.get('/:id', async (c) => {
   const filing = await filingService.getFilingById(c.req.param('id'));
@@ -65,17 +79,7 @@ filingsRouter.put('/:id', async (c) => {
   const body = await c.req.json<UpdateFilingRequest>();
 
   try {
-    const filing = await filingService.updateFiling(c.req.param('id'), body, user.id);
-
-    await auditService.logAudit({
-      action: 'filing_updated',
-      entityType: 'filing',
-      entityId: filing.id,
-      userId: user.id,
-      userName: user.name,
-      detail: { changes: body },
-    });
-
+    const filing = await filingService.updateFiling(c.req.param('id'), body, user.id, user.name);
     return c.json({ success: true, data: filing, error: null });
   } catch (err) {
     const message = err instanceof Error ? err.message : '更新失败';
@@ -88,19 +92,23 @@ filingsRouter.post('/:id/submit', async (c) => {
   const user = c.get('user');
 
   try {
-    const filing = await filingService.submitFiling(c.req.param('id'), user.id);
-
-    await auditService.logAudit({
-      action: 'filing_submitted',
-      entityType: 'filing',
-      entityId: filing.id,
-      userId: user.id,
-      userName: user.name,
-    });
-
+    const filing = await filingService.submitFiling(c.req.param('id'), user.id, user.name);
     return c.json({ success: true, data: filing, error: null });
   } catch (err) {
     const message = err instanceof Error ? err.message : '提交失败';
+    return c.json({ success: false, data: null, error: message }, 400);
+  }
+});
+
+/** POST /api/filings/:id/recall — 撤回备案 */
+filingsRouter.post('/:id/recall', async (c) => {
+  const user = c.get('user');
+
+  try {
+    const filing = await filingService.recallFiling(c.req.param('id'), user.id, user.name);
+    return c.json({ success: true, data: filing, error: null });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '撤回失败';
     return c.json({ success: false, data: null, error: message }, 400);
   }
 });

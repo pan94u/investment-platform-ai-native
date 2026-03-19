@@ -1,0 +1,49 @@
+/** 审批链中的单个审批人 */
+export interface ApproverInfo {
+  readonly userId: string;
+  readonly name: string;
+  readonly level: number; // 1-based
+}
+
+/** 获取审批链时的上下文 */
+export interface ApproverChainContext {
+  readonly creatorId: string;
+  readonly creatorDepartment: string;
+  readonly creatorDomain: string;
+  readonly filingType: string;
+  readonly amount: string;
+}
+
+/**
+ * 组织数据提供者
+ * PoC: DatabaseOrgProvider (查本地 users 表)
+ * 生产: 对接集团组织中心 API
+ */
+export interface OrgProvider {
+  getApproverChain(ctx: ApproverChainContext): Promise<readonly ApproverInfo[]>;
+}
+
+/** 推送待办时的数据载体 */
+export interface TodoPayload {
+  readonly approvalId: string;
+  readonly filingId: string;
+  readonly filingTitle: string;
+  readonly filingNumber: string;
+  readonly approverUserId: string;
+  readonly approverName: string;
+  readonly level: number;
+  readonly creatorName: string;
+  readonly amount: string;
+  readonly filingType: string;
+}
+
+/**
+ * 通知提供者
+ * PoC: MockNotifyProvider (console.log)
+ * 生产: FeishuNotifyProvider (飞书待办 API)
+ */
+export interface NotifyProvider {
+  pushTodo(payload: TodoPayload): Promise<string | null>; // returns externalTodoId
+  updateTodo(externalTodoId: string, update: Record<string, string>): Promise<void>;
+  closeTodo(externalTodoId: string, result: 'approved' | 'rejected' | 'recalled'): Promise<void>;
+}
