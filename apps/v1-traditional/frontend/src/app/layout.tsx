@@ -9,7 +9,16 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN">
-      <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+        />
+      </head>
+      <body
+        className="min-h-screen bg-[#FAFAF9] text-gray-900 antialiased"
+        style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif", fontFeatureSettings: "'cv11', 'ss01'" }}
+      >
         {children}
       </body>
     </html>

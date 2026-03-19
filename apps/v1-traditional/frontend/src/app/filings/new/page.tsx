@@ -17,23 +17,23 @@ const INDUSTRIES: Record<string, string[]> = {
 
 const TYPE_META: Record<string, { icon: React.ReactNode; desc: string }> = {
   equity_direct: {
-    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>,
+    icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>,
     desc: '对标的公司进行直接股权投资',
   },
   fund_project: {
-    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20V10" /><path d="M18 20V4" /><path d="M6 20v-4" /></svg>,
+    icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20V10" /><path d="M18 20V4" /><path d="M6 20v-4" /></svg>,
     desc: '通过基金投资的具体项目',
   },
   fund_investment: {
-    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" /><path d="M12 18V6" /></svg>,
+    icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" /><path d="M12 18V6" /></svg>,
     desc: '基金层面的投资备案（新设/退出）',
   },
   legal_entity: {
-    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2" /><line x1="9" y1="22" x2="9" y2="2" /><line x1="15" y1="22" x2="15" y2="2" /><line x1="4" y1="12" x2="20" y2="12" /></svg>,
+    icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2" /><line x1="9" y1="22" x2="9" y2="2" /><line x1="15" y1="22" x2="15" y2="2" /><line x1="4" y1="12" x2="20" y2="12" /></svg>,
     desc: '设立新的投资法人主体',
   },
   other: {
-    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>,
+    icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>,
     desc: '内部股权交易、土地/园区等',
   },
 };
@@ -147,37 +147,37 @@ export default function NewFilingPage() {
   const showEarnoutFields = form.projectStage === 'change';
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[#FAFAF9]">
       <Nav />
-      <main className="mx-auto max-w-2xl px-6 py-8">
+      <main className="mx-auto max-w-7xl px-6 py-8"><div className="mx-auto max-w-4xl">
         {/* Step indicator */}
         <div className="mb-8 flex items-center gap-3">
           <StepDot active={step === 0} done={step > 0} label="1" />
-          <div className={`h-px flex-1 ${step > 0 ? 'bg-blue-400' : 'bg-slate-200'}`} />
+          <div className={`h-px flex-1 ${step > 0 ? 'bg-[#0066CC]' : 'bg-gray-200'}`} />
           <StepDot active={step === 1} done={false} label="2" />
         </div>
 
         {step === 0 ? (
           <>
             <div className="mb-6">
-              <h1 className="text-lg font-semibold text-slate-800">选择备案类型</h1>
-              <p className="mt-1 text-sm text-slate-400">请选择与本次投资事项匹配的备案类型</p>
+              <h1 className="text-xl font-semibold text-gray-900">选择备案类型</h1>
+              <p className="mt-1 text-sm text-gray-400">请选择与本次投资事项匹配的备案类型</p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2.5 sm:grid-cols-2">
               {Object.entries(FILING_TYPE_LABELS).map(([key, label]) => {
                 const meta = TYPE_META[key];
                 return (
                   <button
                     key={key}
                     onClick={() => { update('type', key); update('projectStage', TYPE_ALLOWED_STAGES[key]?.[0] ?? 'invest'); setStep(1); }}
-                    className="card group flex items-start gap-4 p-5 text-left transition-all hover:ring-2 hover:ring-blue-400/40"
+                    className="card group flex items-start gap-3.5 p-4 text-left transition-all hover:shadow-md hover:ring-1 hover:ring-[#0066CC]/30"
                   >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition-colors group-hover:bg-blue-50 group-hover:text-blue-600">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors group-hover:text-gray-700">
                       {meta?.icon}
                     </div>
                     <div>
-                      <div className="font-medium text-slate-700 group-hover:text-blue-600">{label}</div>
-                      <div className="mt-0.5 text-[13px] text-slate-400">{meta?.desc}</div>
+                      <div className="text-sm font-medium text-gray-700 group-hover:text-gray-900">{label}</div>
+                      <div className="mt-0.5 text-xs text-gray-400">{meta?.desc}</div>
                     </div>
                   </button>
                 );
@@ -188,21 +188,21 @@ export default function NewFilingPage() {
           <>
             <div className="mb-6 flex items-center justify-between">
               <div>
-                <h1 className="text-lg font-semibold text-slate-800">
+                <h1 className="text-xl font-semibold text-gray-900">
                   填写{FILING_TYPE_LABELS[form.type]}信息
                 </h1>
-                <p className="mt-1 text-sm text-slate-400">请填写以下必要信息</p>
+                <p className="mt-1 text-sm text-gray-400">请填写以下必要信息</p>
               </div>
-              <button onClick={() => setStep(0)} className="text-sm text-slate-400 transition hover:text-blue-600">
+              <button onClick={() => setStep(0)} className="text-sm text-gray-400 transition hover:text-gray-700">
                 &larr; 返回选择
               </button>
             </div>
 
             {error && (
-              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>
+              <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>
             )}
 
-            <div className="card space-y-5 p-6">
+            <div className="card space-y-5 p-5">
               {/* 项目阶段 */}
               {allowedStages.length > 1 && (
                 <Field label="项目阶段" required>
@@ -211,10 +211,10 @@ export default function NewFilingPage() {
                       <button
                         key={s}
                         onClick={() => update('projectStage', s)}
-                        className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
+                        className={`rounded-md border px-3.5 py-1.5 text-sm font-medium transition ${
                           form.projectStage === s
-                            ? 'border-blue-500 bg-blue-50 text-blue-700'
-                            : 'border-slate-200 bg-white text-slate-500 hover:border-blue-300'
+                            ? 'border-[#0066CC] bg-[#0066CC] text-white'
+                            : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
                         }`}
                       >
                         {PROJECT_STAGE_LABELS[s]}
@@ -278,28 +278,28 @@ export default function NewFilingPage() {
                     </Field>
                   </div>
                   <Field label="变更原因">
-                    <textarea value={form.changeReason} onChange={(e) => update('changeReason', e.target.value)} className="form-input min-h-[80px] resize-none" placeholder="请说明变更原因" />
+                    <textarea value={form.changeReason} onChange={(e) => update('changeReason', e.target.value)} className="form-input min-h-[72px] resize-none" placeholder="请说明变更原因" />
                   </Field>
                 </>
               )}
 
               <Field label="备案具体事项">
-                <textarea value={form.description} onChange={(e) => update('description', e.target.value)} className="form-input min-h-[80px] resize-none"
+                <textarea value={form.description} onChange={(e) => update('description', e.target.value)} className="form-input min-h-[72px] resize-none"
                   placeholder="请清晰、完整、规范填写本次需备案的核心内容" />
               </Field>
 
               {/* 审批组勾选 */}
               <Field label="集团审批组" required>
-                <p className="mb-2 text-xs text-slate-400">请勾选本次备案需要的审批组</p>
+                <p className="mb-2 text-xs text-gray-400">请勾选本次备案需要的审批组</p>
                 <div className="flex flex-wrap gap-2">
                   {APPROVAL_GROUPS.map((g) => (
                     <button
                       key={g}
                       onClick={() => toggleGroup(g)}
-                      className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
+                      className={`rounded-md border px-3 py-1.5 text-sm font-medium transition ${
                         form.approvalGroups.includes(g)
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-slate-200 bg-white text-slate-500 hover:border-blue-300'
+                          ? 'border-[#0066CC] bg-blue-50 text-[#0066CC]'
+                          : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
                       }`}
                     >
                       {form.approvalGroups.includes(g) ? '✓ ' : ''}{APPROVAL_GROUP_LABELS[g]}
@@ -311,102 +311,88 @@ export default function NewFilingPage() {
 
             {/* 审批流程预览 */}
             {form.domain && (
-              <div className="mt-6 card p-5">
-                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                  </svg>
+              <div className="mt-5 card p-5">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">
                   审批流程预览
                 </h3>
                 {chainLoading ? (
-                  <p className="text-sm text-slate-400">加载审批链...</p>
+                  <p className="text-sm text-gray-400">加载审批链...</p>
                 ) : !chainPreview ? (
-                  <p className="text-sm text-slate-400">未匹配到审批人</p>
+                  <p className="text-sm text-gray-400">未匹配到审批人</p>
                 ) : (
-                  <div className="space-y-3">
-                    {/* 业务侧 */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <ChainNode label="发起人" name={currentUser?.name ?? '我'} color="blue" />
-                      {chainPreview.business.map((a) => (
-                        <ChainArrowNode key={a.userId} label={`业务L${a.level}`} name={a.name} color="blue" />
-                      ))}
-                    </div>
-                    {/* 集团审批组 */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ChainNode label="发起人" name={currentUser?.name ?? '我'} />
+                    {chainPreview.business.map((a) => (
+                      <ChainArrowNode key={a.userId} label={`业务L${a.level}`} name={a.name} />
+                    ))}
                     {chainPreview.group.length > 0 && (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs text-slate-400 mr-1">集团审批组:</span>
+                      <>
+                        <ChainDivider />
                         {chainPreview.group.map((g) => (
-                          <ChainNode key={g.groupName} label={APPROVAL_GROUP_LABELS[g.groupName] ?? g.groupName} name={g.name} color="violet" />
+                          <ChainNode key={g.groupName} label={APPROVAL_GROUP_LABELS[g.groupName] ?? g.groupName} name={g.name} />
                         ))}
-                      </div>
+                      </>
                     )}
-                    {/* 最终确认 */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-400 mr-1">最终确认:</span>
-                      <ChainNode label="确认人" name={chainPreview.confirmation.name} color="green" />
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-slate-300 shrink-0"><polyline points="9 18 15 12 9 6" /></svg>
-                      <div className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-500"><polyline points="20 6 9 17 4 12" /></svg>
-                        <span className="text-sm font-medium text-green-700">完成</span>
-                      </div>
-                    </div>
+                    <ChainDivider />
+                    <ChainNode label="确认人" name={chainPreview.confirmation.name} />
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#0066CC]/30 shrink-0"><polyline points="9 18 15 12 9 6" /></svg>
+                    <span className="text-sm font-medium text-emerald-600">完成</span>
                   </div>
                 )}
               </div>
             )}
 
-            <div className="mt-6 flex gap-3">
+            <div className="mt-5 flex gap-2.5">
               <button onClick={() => handleSave(false)} disabled={submitting}
-                className="rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-50">
+                className="rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50">
                 保存草稿
               </button>
               <button onClick={() => handleSave(true)} disabled={submitting}
-                className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50">
+                className="rounded-md bg-[#0066CC] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#0055AA] active:bg-[#004488] disabled:opacity-50">
                 保存并提交审批
               </button>
             </div>
           </>
         )}
-      </main>
+      </div></main>
     </div>
   );
 }
 
-function ChainNode({ label, name, color }: { label: string; name: string; color: 'blue' | 'violet' | 'green' }) {
-  const colorMap = {
-    blue: 'bg-blue-100 text-blue-600',
-    violet: 'bg-violet-100 text-violet-600',
-    green: 'bg-green-100 text-green-600',
-  };
+function ChainNode({ label, name }: { label: string; name: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
-      <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${colorMap[color]}`}>
+    <div className="flex items-center gap-2 rounded-md bg-blue-50/60 px-2.5 py-1.5">
+      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0066CC]/10 text-xs font-semibold text-[#0066CC]">
         {name[0]}
       </div>
       <div>
-        <div className="text-xs text-slate-400">{label}</div>
-        <div className="text-sm font-medium text-slate-700">{name}</div>
+        <div className="text-xs text-gray-400">{label}</div>
+        <div className="text-sm font-medium text-gray-700">{name}</div>
       </div>
     </div>
   );
 }
 
-function ChainArrowNode({ label, name, color }: { label: string; name: string; color: 'blue' | 'violet' | 'green' }) {
+function ChainArrowNode({ label, name }: { label: string; name: string }) {
   return (
     <>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-slate-300 shrink-0"><polyline points="9 18 15 12 9 6" /></svg>
-      <ChainNode label={label} name={name} color={color} />
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#0066CC]/30 shrink-0"><polyline points="9 18 15 12 9 6" /></svg>
+      <ChainNode label={label} name={name} />
     </>
   );
 }
 
+function ChainDivider() {
+  return <div className="mx-1 h-4 w-px bg-[#0066CC]/20" />;
+}
+
 function StepDot({ active, done, label }: { active: boolean; done: boolean; label: string }) {
   return (
-    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition ${
-      active ? 'bg-blue-600 text-white' : done ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-400'
+    <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition ${
+      active ? 'bg-[#0066CC] text-white' : done ? 'bg-blue-100 text-[#0066CC]' : 'bg-gray-100 text-gray-400'
     }`}>
       {done ? (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
       ) : label}
     </div>
   );
@@ -415,7 +401,7 @@ function StepDot({ active, done, label }: { active: boolean; done: boolean; labe
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium text-slate-600">
+      <label className="mb-1.5 block text-sm font-medium text-gray-600">
         {label}{required && <span className="ml-0.5 text-red-400">*</span>}
       </label>
       {children}

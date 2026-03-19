@@ -32,33 +32,34 @@ export function Nav() {
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/80 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
+    <header className="sticky top-0 z-30 border-b border-black/[0.06] bg-white/80 backdrop-blur-md">
+      <div className="mx-auto flex h-12 max-w-7xl items-center justify-between px-6">
         <div className="flex items-center gap-8">
-          <Link href="/dashboard" className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <div className="flex h-6 w-6 items-center justify-center rounded bg-[#0066CC] text-xs font-bold text-white">
               投
             </div>
-            <span className="text-base font-bold text-slate-800 tracking-tight">投资备案</span>
+            <span className="text-base font-bold text-gray-800 tracking-tight">投资备案</span>
           </Link>
-          <nav className="flex">
+          <nav className="flex items-center gap-1">
             {NAV_ITEMS.map((item) => {
-              const active = item.href === '/filings/new'
-                ? pathname === '/filings/new'
-                : pathname.startsWith(item.href);
+              const active =
+                item.href === '/filings'
+                  ? pathname === '/filings' || (pathname.startsWith('/filings/') && pathname !== '/filings/new')
+                  : pathname.startsWith(item.href);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`relative px-3 py-4 text-sm font-medium transition-colors ${
+                  className={`relative px-3 py-3 text-sm font-medium transition-colors ${
                     active
-                      ? 'text-blue-600'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'text-[#0066CC]'
+                      : 'text-gray-400 hover:text-gray-700'
                   }`}
                 >
                   {item.label}
                   {active && (
-                    <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-blue-600" />
+                    <span className="absolute left-1/2 bottom-1.5 -translate-x-1/2 h-1 w-1 rounded-full bg-[#0066CC]" />
                   )}
                 </Link>
               );
@@ -66,18 +67,18 @@ export function Nav() {
           </nav>
         </div>
         {user && (
-          <div className="flex items-center gap-3">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-500">
               {user.name[0]}
             </div>
             <div className="text-sm">
-              <span className="font-medium text-slate-700">{user.name}</span>
-              <span className="mx-1.5 text-slate-200">|</span>
-              <span className="text-slate-400">{user.department}</span>
+              <span className="font-medium text-gray-600">{user.name}</span>
+              <span className="mx-1.5 text-gray-200">|</span>
+              <span className="text-gray-400">{user.department}</span>
             </div>
             <button
               onClick={handleLogout}
-              className="ml-1 rounded-md px-2 py-1 text-xs text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
+              className="ml-1 rounded-md px-2 py-1 text-xs text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
             >
               退出
             </button>

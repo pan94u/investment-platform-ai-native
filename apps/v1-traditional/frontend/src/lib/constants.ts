@@ -33,13 +33,13 @@ export const STATUS_LABELS: Record<string, string> = {
 };
 
 export const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-700',
-  pending_business: 'bg-orange-100 text-orange-700',
-  pending_group: 'bg-orange-100 text-orange-700',
-  pending_confirmation: 'bg-blue-100 text-blue-700',
-  completed: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-700',
-  recalled: 'bg-slate-100 text-slate-600',
+  draft: 'bg-gray-100 text-gray-600',
+  pending_business: 'bg-amber-50 text-amber-700',
+  pending_group: 'bg-violet-50 text-violet-700',
+  pending_confirmation: 'bg-blue-50 text-blue-700',
+  completed: 'bg-emerald-50 text-emerald-700',
+  rejected: 'bg-red-50 text-red-600',
+  recalled: 'bg-gray-100 text-gray-500',
 };
 
 export const DOMAIN_LABELS: Record<string, string> = {

@@ -14,10 +14,10 @@ export default function DashboardPage() {
 
   if (!stats) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-[#FAFAF9]">
         <Nav />
         <div className="flex items-center justify-center py-32">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600" />
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200 border-t-gray-600" />
         </div>
       </div>
     );
@@ -34,42 +34,41 @@ export default function DashboardPage() {
     byStatus.find((s) => s.status === 'completed')?.cnt ?? 0;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[#FAFAF9]">
       <Nav />
       <main className="mx-auto max-w-7xl px-6 py-8">
         {/* ── Overview Stats ─────────────────────────── */}
-        <div className="mb-8 grid grid-cols-2 gap-5 lg:grid-cols-4">
+        <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard
             icon={<IconFile />}
             label="备案总数"
             value={String(stats.totalCount)}
-            accent="blue"
+            iconClassName="bg-blue-50 text-[#0066CC]"
           />
           <StatCard
             icon={<IconAmount />}
             label="总投资金额"
             value={`${Number(stats.totalAmount).toLocaleString()}万`}
-            accent="violet"
+            iconClassName="bg-amber-50 text-amber-600"
           />
           <StatCard
             icon={<IconClock />}
             label="审批中"
             value={String(pendingCount)}
-            accent="amber"
+            iconClassName="bg-violet-50 text-violet-600"
           />
           <StatCard
             icon={<IconCheck />}
             label="已完成"
             value={String(completedCount)}
-            accent="emerald"
+            iconClassName="bg-emerald-50 text-emerald-600"
           />
         </div>
 
         {/* ── Distribution ───────────────────────────── */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
           <DistributionCard
             title="按状态分布"
-            accent="blue"
             items={byStatus.map((s) => ({
               label: STATUS_LABELS[s.status] ?? s.status,
               value: s.cnt,
@@ -77,7 +76,6 @@ export default function DashboardPage() {
           />
           <DistributionCard
             title="按类型分布"
-            accent="violet"
             items={byType.map((t) => ({
               label: FILING_TYPE_LABELS[t.type] ?? t.type,
               value: t.cnt,
@@ -85,7 +83,6 @@ export default function DashboardPage() {
           />
           <DistributionCard
             title="按领域分布"
-            accent="emerald"
             items={byDomain.map((d) => ({
               label: DOMAIN_LABELS[d.domain] ?? d.domain,
               value: d.cnt,
@@ -97,37 +94,26 @@ export default function DashboardPage() {
   );
 }
 
-/* ── Color map ───────────────────────────────────── */
-const ACCENT = {
-  blue:    { bg: 'bg-blue-50',    text: 'text-blue-600',    bar: 'bg-blue-500',    dot: 'bg-blue-600' },
-  violet:  { bg: 'bg-violet-50',  text: 'text-violet-600',  bar: 'bg-violet-500',  dot: 'bg-violet-600' },
-  amber:   { bg: 'bg-amber-50',   text: 'text-amber-600',   bar: 'bg-amber-500',   dot: 'bg-amber-600' },
-  emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600', bar: 'bg-emerald-500', dot: 'bg-emerald-600' },
-} as const;
-
-type Accent = keyof typeof ACCENT;
-
 /* ── Stat Card ───────────────────────────────────── */
 function StatCard({
   icon,
   label,
   value,
-  accent,
+  iconClassName,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
-  accent: Accent;
+  iconClassName?: string;
 }) {
-  const c = ACCENT[accent];
   return (
     <div className="card flex items-center gap-4 p-5">
-      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${c.bg} ${c.text}`}>
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconClassName ?? 'bg-gray-50 text-gray-400'}`}>
         {icon}
       </div>
       <div className="min-w-0">
-        <div className="text-[13px] font-medium text-slate-400">{label}</div>
-        <div className={`mt-0.5 truncate text-2xl font-bold leading-tight tracking-tight ${accent === 'blue' || accent === 'violet' ? 'text-slate-800' : c.text}`}>
+        <div className="text-sm font-medium text-gray-400">{label}</div>
+        <div className="mt-0.5 truncate text-3xl font-semibold leading-tight tracking-tight text-gray-900">
           {value}
         </div>
       </div>
@@ -138,14 +124,11 @@ function StatCard({
 /* ── Distribution Card ───────────────────────────── */
 function DistributionCard({
   title,
-  accent,
   items,
 }: {
   title: string;
-  accent: Accent;
   items: Array<{ label: string; value: number }>;
 }) {
-  const c = ACCENT[accent];
   const maxVal = Math.max(...items.map((i) => i.value), 1);
   const total = items.reduce((sum, i) => sum + i.value, 0);
 
@@ -153,27 +136,27 @@ function DistributionCard({
     <div className="card flex flex-col p-5">
       {/* Header */}
       <div className="mb-5 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className={`h-3.5 w-1 rounded-full ${c.dot}`} />
-          <h3 className="text-sm font-semibold text-slate-700">{title}</h3>
-        </div>
-        <span className="text-xs tabular-nums text-slate-400">共 {total} 项</span>
+        <h3 className="text-base font-semibold text-gray-800">{title}</h3>
+        <span className="text-xs tabular-nums text-gray-400">共 {total} 项</span>
       </div>
 
       {/* Bars */}
       <div className="flex-1 space-y-4">
-        {items.map((item) => (
+        {items.map((item, idx) => (
           <div key={item.label}>
             <div className="mb-1.5 flex items-baseline justify-between">
-              <span className="text-[13px] text-slate-500">{item.label}</span>
-              <span className="text-sm font-semibold tabular-nums text-slate-700">
+              <span className="text-sm text-gray-500">{item.label}</span>
+              <span className="text-sm font-semibold tabular-nums text-gray-700">
                 {item.value}
               </span>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-1 overflow-hidden rounded-full bg-gray-100">
               <div
-                className={`h-full rounded-full ${c.bar} transition-all duration-500 ease-out`}
-                style={{ width: `${(item.value / maxVal) * 100}%`, opacity: 0.75 }}
+                className="h-full rounded-full bg-[#0066CC] transition-all duration-500 ease-out"
+                style={{
+                  width: `${(item.value / maxVal) * 100}%`,
+                  opacity: 1 - (idx * 0.15),
+                }}
               />
             </div>
           </div>
