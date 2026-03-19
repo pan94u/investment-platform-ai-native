@@ -150,13 +150,14 @@ const filingSubmit: ToolFn = async (args, userId) => {
     filingId,
     approverId: supervisors[0].id,
     approverName: supervisors[0].name,
+    stage: 'business',
     level: 1,
     status: 'pending',
   });
 
   const [updated] = await db
     .update(filings)
-    .set({ status: 'pending_level1', submittedAt: now, updatedAt: now })
+    .set({ status: 'pending_business', submittedAt: now, updatedAt: now })
     .where(eq(filings.id, filingId))
     .returning();
 
@@ -234,7 +235,7 @@ const filingExtractFromDoc: ToolFn = async (args) => {
     message: '文档信息提取完成（模拟）',
     extracted: {
       projectName: '模拟提取项目名称',
-      type: 'direct_investment',
+      type: 'equity_direct',
       amount: 5000,
       industry: '智能制造',
       domain: 'smart_living',
@@ -436,7 +437,7 @@ export const toolDefinitions = [
       type: 'object',
       required: ['type', 'title', 'projectName', 'domain', 'industry', 'amount'],
       properties: {
-        type: { type: 'string', enum: ['direct_investment', 'earnout_change', 'fund_exit', 'legal_entity_setup', 'other_change'] },
+        type: { type: 'string', enum: ['equity_direct', 'fund_project', 'fund_investment', 'legal_entity', 'other'] },
         title: { type: 'string' },
         description: { type: 'string' },
         projectName: { type: 'string' },

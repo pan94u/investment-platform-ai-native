@@ -1,6 +1,6 @@
 import { eq, and, ilike, gte, lte, sql, desc, count } from 'drizzle-orm';
 import { filings, approvals, users } from '@filing/database';
-import type { CreateFilingRequest, UpdateFilingRequest, FilingQueryParams } from '@filing/shared';
+import type { CreateFilingRequest, UpdateFilingRequest, FilingQueryParams, ApprovalGroupName } from '@filing/shared';
 import { db } from '../lib/db.js';
 import { generateId, generateFilingNumber } from '../lib/id.js';
 import { getOrgProvider, getNotifyProvider } from '../providers/index.js';
@@ -27,6 +27,7 @@ export async function createFiling(data: CreateFilingRequest, creatorId: string,
     id,
     filingNumber,
     type: data.type,
+    projectStage: data.projectStage ?? 'invest',
     title: data.title,
     description: data.description,
     projectName: data.projectName,
@@ -40,6 +41,8 @@ export async function createFiling(data: CreateFilingRequest, creatorId: string,
     originalTarget: data.originalTarget != null ? String(data.originalTarget) : null,
     newTarget: data.newTarget != null ? String(data.newTarget) : null,
     changeReason: data.changeReason ?? null,
+    approvalGroups: (data.approvalGroups as string[]) ?? [],
+    emailRecipients: (data.emailRecipients as string[]) ?? [],
     status: 'draft',
     creatorId,
   }).returning();
@@ -50,7 +53,7 @@ export async function createFiling(data: CreateFilingRequest, creatorId: string,
     entityId: filing.id,
     userId: creatorId,
     userName: creatorName,
-    detail: { type: data.type, title: data.title, amount: data.amount },
+    detail: { type: data.type, projectStage: data.projectStage, title: data.title, amount: data.amount },
   });
 
   return filing;
@@ -65,6 +68,7 @@ export async function updateFiling(id: string, data: UpdateFilingRequest, userId
 
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
   if (data.type !== undefined) updateData.type = data.type;
+  if (data.projectStage !== undefined) updateData.projectStage = data.projectStage;
   if (data.title !== undefined) updateData.title = data.title;
   if (data.description !== undefined) updateData.description = data.description;
   if (data.projectName !== undefined) updateData.projectName = data.projectName;
@@ -78,6 +82,8 @@ export async function updateFiling(id: string, data: UpdateFilingRequest, userId
   if (data.originalTarget !== undefined) updateData.originalTarget = data.originalTarget != null ? String(data.originalTarget) : null;
   if (data.newTarget !== undefined) updateData.newTarget = data.newTarget != null ? String(data.newTarget) : null;
   if (data.changeReason !== undefined) updateData.changeReason = data.changeReason;
+  if (data.approvalGroups !== undefined) updateData.approvalGroups = data.approvalGroups;
+  if (data.emailRecipients !== undefined) updateData.emailRecipients = data.emailRecipients;
 
   const [updated] = await db.update(filings).set(updateData).where(eq(filings.id, id)).returning();
 
@@ -96,12 +102,11 @@ export async function updateFiling(id: string, data: UpdateFilingRequest, userId
 /** 将备案编号（BG20260313-001）或内部 ID（filing-xxx）统一解析为内部 ID */
 export async function resolveFilingId(idOrNumber: string): Promise<string | null> {
   if (idOrNumber.startsWith('filing-')) return idOrNumber;
-  // 尝试按 filingNumber 查
   if (/^BG\d{8}-\d+$/.test(idOrNumber)) {
     const row = await db.select({ id: filings.id }).from(filings).where(eq(filings.filingNumber, idOrNumber)).limit(1);
     return row[0]?.id ?? null;
   }
-  return idOrNumber; // fallback — 原样传入，由后续查询报错
+  return idOrNumber;
 }
 
 /** 获取单个备案详情 */
@@ -132,6 +137,7 @@ export async function queryFilings(params: FilingQueryParams) {
 
   const conditions = [];
   if (params.type) conditions.push(eq(filings.type, params.type));
+  if (params.projectStage) conditions.push(eq(filings.projectStage, params.projectStage));
   if (params.status) conditions.push(eq(filings.status, params.status));
   if (params.domain) conditions.push(eq(filings.domain, params.domain));
   if (params.creatorId) conditions.push(eq(filings.creatorId, params.creatorId));
@@ -155,7 +161,15 @@ export async function queryFilings(params: FilingQueryParams) {
   return { data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
 }
 
-/** 提交备案（草稿→待审批），使用 OrgProvider 获取审批链 */
+/**
+ * 提交备案（草稿 → pending_business）
+ *
+ * 流程:
+ * 1. 通过 OrgProvider 获取业务侧审批链
+ * 2. 创建第一级业务审批
+ * 3. 推送待办通知
+ * 4. 状态变更: draft → pending_business
+ */
 export async function submitFiling(filingId: string, userId: string, userName: string) {
   const existing = await db.select().from(filings).where(eq(filings.id, filingId)).limit(1);
   if (existing.length === 0) throw new Error('备案不存在');
@@ -168,9 +182,9 @@ export async function submitFiling(filingId: string, userId: string, userName: s
   const creatorRows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   const creator = creatorRows[0];
 
-  // 通过 OrgProvider 获取审批链（含同人捏合）
+  // 通过 OrgProvider 获取业务侧审批链
   const orgProvider = getOrgProvider();
-  const chain = await orgProvider.getApproverChain({
+  const chain = await orgProvider.getBusinessApproverChain({
     creatorId: userId,
     creatorDepartment: creator.department,
     creatorDomain: creator.domain,
@@ -183,7 +197,7 @@ export async function submitFiling(filingId: string, userId: string, userName: s
   const now = new Date();
   const notifyProvider = getNotifyProvider();
 
-  // 创建第一级审批
+  // 创建第一级业务审批
   const approvalId = generateId('approval');
   const firstApprover = chain[0];
 
@@ -192,6 +206,7 @@ export async function submitFiling(filingId: string, userId: string, userName: s
     filingId,
     approverId: firstApprover.userId,
     approverName: firstApprover.name,
+    stage: 'business',
     level: 1,
     status: 'pending',
   });
@@ -204,6 +219,7 @@ export async function submitFiling(filingId: string, userId: string, userName: s
     filingNumber: filing.filingNumber,
     approverUserId: firstApprover.userId,
     approverName: firstApprover.name,
+    stage: 'business',
     level: 1,
     creatorName: userName,
     amount: filing.amount,
@@ -217,7 +233,7 @@ export async function submitFiling(filingId: string, userId: string, userName: s
   // 更新备案状态
   const [updated] = await db
     .update(filings)
-    .set({ status: 'pending_level1', submittedAt: now, updatedAt: now })
+    .set({ status: 'pending_business', submittedAt: now, updatedAt: now })
     .where(eq(filings.id, filingId))
     .returning();
 
@@ -227,37 +243,40 @@ export async function submitFiling(filingId: string, userId: string, userName: s
     entityId: filingId,
     userId,
     userName,
-    detail: { approverChainLength: chain.length, firstApprover: firstApprover.name },
+    detail: {
+      businessChainLength: chain.length,
+      firstApprover: firstApprover.name,
+      approvalGroups: filing.approvalGroups,
+    },
   });
 
   return updated;
 }
 
-/** 撤回备案（发起人在审批未决前撤回） */
+/**
+ * 撤回备案（发起人在审批未决前撤回）
+ * 允许状态: pending_business / pending_group / pending_confirmation
+ */
 export async function recallFiling(filingId: string, userId: string, userName: string) {
   const existing = await db.select().from(filings).where(eq(filings.id, filingId)).limit(1);
   if (existing.length === 0) throw new Error('备案不存在');
 
   const filing = existing[0];
-  if (filing.status !== 'pending_level1' && filing.status !== 'pending_level2') {
+  const recallableStatuses = ['pending_business', 'pending_group', 'pending_confirmation'];
+  if (!recallableStatuses.includes(filing.status)) {
     throw new Error('仅待审批状态可撤回');
   }
   if (filing.creatorId !== userId) throw new Error('仅发起人可撤回');
-
-  // 检查是否有已决定的审批（已决定的不允许撤回）
-  const pendingApprovals = await db
-    .select()
-    .from(approvals)
-    .where(and(eq(approvals.filingId, filingId), eq(approvals.status, 'pending')));
-
-  if (pendingApprovals.length === 0) {
-    throw new Error('当前审批已被处理，无法撤回');
-  }
 
   const now = new Date();
   const notifyProvider = getNotifyProvider();
 
   // 关闭所有 pending 审批
+  const pendingApprovals = await db
+    .select()
+    .from(approvals)
+    .where(and(eq(approvals.filingId, filingId), eq(approvals.status, 'pending')));
+
   for (const approval of pendingApprovals) {
     await db.update(approvals).set({
       status: 'rejected',

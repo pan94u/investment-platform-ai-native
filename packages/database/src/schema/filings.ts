@@ -1,12 +1,13 @@
-import { pgTable, text, timestamp, varchar, numeric, integer } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, varchar, numeric, jsonb } from 'drizzle-orm/pg-core';
 import { users } from './users.js';
 
 export const filings = pgTable('filings', {
   id: text('id').primaryKey(),
   filingNumber: varchar('filing_number', { length: 30 }).notNull().unique(),
-  type: varchar('type', { length: 30 }).notNull(),             // direct_investment | earnout_change | fund_exit | legal_entity_setup | other_change
-  title: varchar('title', { length: 200 }).notNull(),
-  description: text('description').notNull().default(''),
+  type: varchar('type', { length: 30 }).notNull(),                 // equity_direct | fund_project | fund_investment | legal_entity | other
+  projectStage: varchar('project_stage', { length: 20 }).notNull().default('invest'),  // invest | exit | change | other
+  title: varchar('title', { length: 200 }).notNull(),              // 项目说明（一句话摘要）
+  description: text('description').notNull().default(''),          // 备案具体事项
 
   // 项目信息
   projectName: varchar('project_name', { length: 200 }).notNull(),
@@ -27,8 +28,13 @@ export const filings = pgTable('filings', {
   newTarget: numeric('new_target', { precision: 15, scale: 2 }),              // 万元
   changeReason: text('change_reason'),
 
+  // 流程相关
+  approvalGroups: jsonb('approval_groups').$type<string[]>().notNull().default([]),  // 发起人勾选的审批组 ['finance','hr',...]
+  emailRecipients: jsonb('email_recipients').$type<string[]>().notNull().default([]),  // 邮件收件人 userId[]
+  confirmedBy: text('confirmed_by'),     // 最终确认人 userId
+
   // 状态
-  status: varchar('status', { length: 20 }).notNull().default('draft'),
+  status: varchar('status', { length: 30 }).notNull().default('draft'),
   riskLevel: varchar('risk_level', { length: 10 }),                           // low | medium | high (V3+)
 
   // 关联

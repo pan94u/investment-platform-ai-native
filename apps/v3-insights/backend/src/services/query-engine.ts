@@ -12,21 +12,21 @@ const domainLabels: Record<string, string> = {
 };
 
 const typeLabels: Record<string, string> = {
-  direct_investment: '直投投资',
-  earnout_change: '对赌变更',
-  fund_exit: '基金投退出',
-  legal_entity_setup: '法人新设',
-  other_change: '其他变更',
+  equity_direct: '股权直投',
+  fund_project: '基金投项目',
+  fund_investment: '基金投资',
+  legal_entity: '法人新设',
+  other: '其他',
 };
 
 const statusLabels: Record<string, string> = {
   draft: '草稿',
-  submitted: '已提交',
-  pending_level1: '待直属上级审批',
-  pending_level2: '待集团审批',
-  approved: '已通过',
-  rejected: '已驳回',
+  pending_business: '业务审批中',
+  pending_group: '集团审批中',
+  pending_confirmation: '待最终确认',
   completed: '已完成',
+  rejected: '已驳回',
+  recalled: '已撤回',
 };
 
 // ============================================================
@@ -79,10 +79,10 @@ function extractDomain(question: string): string | null {
 
 /** Extract type filter from question */
 function extractType(question: string): string | null {
-  if (/直投/.test(question)) return 'direct_investment';
-  if (/对赌/.test(question)) return 'earnout_change';
-  if (/退出/.test(question)) return 'fund_exit';
-  if (/法人新设|新设/.test(question)) return 'legal_entity_setup';
+  if (/直投/.test(question)) return 'equity_direct';
+  if (/对赌/.test(question)) return 'equity_direct';
+  if (/退出/.test(question)) return 'fund_project';
+  if (/法人新设|新设/.test(question)) return 'legal_entity';
   return null;
 }
 
@@ -260,7 +260,7 @@ async function handleAnomaly(question: string): Promise<QueryResult> {
       cnt: count(),
     })
     .from(filings)
-    .where(eq(filings.type, 'earnout_change'))
+    .where(eq(filings.type, 'equity_direct'))
     .groupBy(filings.projectName)
     .having(sql`COUNT(*) > 1`);
 
@@ -364,7 +364,7 @@ async function handleProjectHistory(question: string): Promise<QueryResult> {
 async function handleClawback(question: string): Promise<QueryResult> {
   const projectName = extractProjectName(question);
 
-  const conditions = [eq(filings.type, 'earnout_change')];
+  const conditions = [eq(filings.type, 'equity_direct')];
   if (projectName) conditions.push(ilike(filings.projectName, `%${projectName}%`));
   const where = and(...conditions);
 

@@ -1,6 +1,6 @@
 # 设计基线（Design Baseline）
 
-> 版本：v1.0 | 日期：2026-03-11 | 状态：从代码反写
+> 版本：v2.0 | 日期：2026-03-19 | 状态：从代码反写
 >
 > 本文档记录"我们实际构建了什么"，从代码实现中反向工程得出。
 > 与 `plan-baseline.md`（"我们想要构建什么"）交叉比对，得出偏差分析。
@@ -16,27 +16,32 @@
 
 | 编号 | 功能 | 状态 | 实现说明 |
 |------|------|------|---------|
-| F1.1 | 备案数据模型（直投/基金投/法人/其他） | 🔄 变更 | 实现了通用备案模型（filings 表），包含 type 字段支持分类，但未按直投/基金投/法人/其他做独立 Schema 区分；基金备案未预留 |
-| F1.2 | 表单引擎（JSON Schema 驱动） | ✂️ 已裁剪 | 未实现 JSON Schema 驱动的可配置表单引擎，前端使用硬编码表单 |
-| F1.3 | 审批流引擎（支持分级审批） | 🔄 变更 | 实现了 2 级审批链（直属上级 + 集团审批），但非配置驱动的通用引擎，而是硬编码的两级逻辑 |
-| F1.4 | 外围系统 Mock（战投/法务/飞书） | 🔄 变更 | 实现了 Mock 路由组，但仅提供基础数据 Mock，未模拟战投/法务/飞书的完整联动机制 |
-| F1.5 | 备案状态机（草稿→审批中→已完成/已驳回） | ✅ 已实现 | filing 服务实现了 draft → pending → approved/rejected 状态流转 |
-| F1.6 | 底线规则引擎（必填/金额/关联校验） | ✂️ 已裁剪 | 未实现独立规则引擎，基础校验内嵌在路由/服务层 |
-| F1.7 | 自动留痕基座（对话存档/操作日志/来源标注） | 🔄 变更 | 实现了 audit_logs 表和 audit 服务，记录操作日志；但无对话存档（V1 无对话）、无来源标注 |
-| F1.8 | 备案列表与查询（多维度筛选） | 🔄 变更 | 实现了备案列表页面和 API，但筛选能力有限，无导出功能 |
-| F1.9 | 附件上传与存储 | ✂️ 已裁剪 | 数据库有 attachments 表定义，但未实现上传/下载 API 和前端交互 |
-| F1.10 | 用户认证与基础权限 | 🔄 变更 | 使用 X-User-Id 请求头模拟认证，无真实 SSO Mock，角色隔离通过 seed 数据中的 role 字段实现 |
+| F1.1 | 备案数据模型（5 类场景 + 子场景） | ✅ 已实现 | filings 表支持 5 类一级场景（equity_direct/fund_project/fund_investment/legal_entity/other）+ projectStage 字段（invest/exit/change/other）覆盖子场景 |
+| F1.2 | 备案表单（14 字段，含自动填充与下拉枚举） | ✅ 已实现 | 前端表单包含全部 14 字段：领域/行业（自动带出）、项目名称、项目编号（自动生成）、项目类型（5 选 1）、项目阶段（按类型联动）、金额（语境化提示）、发起人（自动）、项目说明、具体事项、审批组勾选（5 选 N）；附件/收件人/确认人待后续 |
+| F1.3 | 审批流引擎（业务侧逐级 + 集团审批组 + 最终确认） | ✅ 已实现 | 三阶段审批引擎：业务侧 N 级逐级上溯（OrgProvider 抽象）→ 集团审批组并行（5 选 N）→ 最终确认（曹智）。支持同意/驳回/知悉三种操作。同人捏合逻辑。Provider 隔离层支持未来对接组织中心 |
+| F1.4 | 外围系统 Mock（组织中心/飞书/邮件） | ✅ 已实现 | OrgProvider（DatabaseOrgProvider）Mock 组织中心 + NotifyProvider（MockNotifyProvider / FeishuNotifyProvider）Mock 飞书待办推送 |
+| F1.5 | 备案状态机（草稿→业务审批→集团审批→确认→已完成/已驳回/已撤回） | ✅ 已实现 | 7 状态完整流转：draft → pending_business → pending_group → pending_confirmation → completed / rejected / recalled。E2E 验证全部通过 |
+| F1.6 | 底线规则引擎（必填/金额/关联校验） | 🔄 变更 | 基础校验内嵌在路由层（type/projectStage/title/projectName/domain/industry/amount 必填校验），未实现独立规则引擎 |
+| F1.7 | 自动留痕基座（操作日志/来源标注/审计留痕） | ✅ 已实现 | audit_logs 表 + audit 服务，记录 filing_created/updated/submitted/approved/acknowledged/rejected/recalled + approval_reassigned/batch_approved，覆盖全部审批阶段 |
+| F1.8 | 备案列表与查询（多维度筛选） | ✅ 已实现 | 支持按类型、阶段、状态、领域、创建人、日期范围、关键词筛选，分页返回 |
+| F1.9 | 附件上传与存储（多格式） | ✂️ 已裁剪 | 数据库有 attachments 表定义，但未实现上传/下载 API 和前端交互 |
+| F1.10 | 用户认证与基础权限 | 🔄 变更 | X-User-Id 请求头 Mock 认证 + requireRole 中间件角色隔离，5 个角色（initiator/supervisor/group_approver/admin/viewer） |
+| F1.11 | 审批组配置管理（5 组审批人 + 固定邮件名单） | 🔄 变更 | 审批组定义硬编码在 APPROVAL_GROUP_CONFIG 常量（含 5 组审批人姓名/邮箱 + DEFAULT_EMAIL_CC_LIST 固定抄送名单），预留配置化接口 |
+| F1.12 | 邮件通知机制（备案完成后发送通知邮件） | ✂️ 已裁剪 | 邮件收件人字段已在 schema 中预留（emailRecipients），MockNotifyProvider 打印日志，但未实现实际邮件发送 |
 
 ### 实际交付物
 
-- **后端**：Hono 框架，14 个 TS 文件
-  - 5 个路由组：auth、filings（CRUD + submit）、approvals（2 级审批）、dashboard、mock
-  - 3 个服务：filing（CRUD + submit + dashboard 统计）、approval（2 级审批链）、audit（操作日志）
-- **前端**：Next.js 15 App Router + Tailwind CSS，9 个页面
-  - 登录页、仪表盘、备案列表、备案详情、新建备案、审批页面
+- **后端**：Hono 框架，26 个 TS 文件
+  - 7 个路由组：auth、filings（CRUD + submit + recall + chain-preview）、approvals（三阶段审批 + 知悉 + 改派 + 批量）、dashboard、mock、mcp、webhooks
+  - 3 个服务：filing（CRUD + submit + recall + dashboard 统计）、approval（三阶段审批引擎）、audit（操作日志）
+  - Provider 隔离层：OrgProvider（业务链 + 集团组 + 确认人）、NotifyProvider（Mock + 飞书）
+- **前端**：Next.js 15 App Router + Tailwind CSS，8 个页面
+  - 登录页、仪表盘、备案列表、备案详情（含审批历史 timeline）、新建备案（14 字段 + 审批组勾选 + 审批链预览）、审批待办（三阶段标签 + 同意/驳回/知悉）
 - **数据库**：PostgreSQL + Drizzle ORM，5 张表（users, filings, approvals, attachments, audit_logs）
-- **种子数据**：5 个用户、5 条备案、3 条审批记录
-- **部署**：Docker Compose + Nginx 反向代理 + 部署/验证脚本
+  - filings 表新增：project_stage, approval_groups(jsonb), email_recipients(jsonb), confirmed_by
+  - approvals 表新增：stage(business/group/confirmation), group_name
+- **种子数据**：5 个用户、5 条备案（含新类型枚举）、5 条审批记录（含三阶段示例）
+- **E2E 验证**：7 个测试用例，浏览器手动验证全部通过（TC-01~TC-07，覆盖 S1~S10）
 
 ---
 
@@ -204,15 +209,15 @@
 
 | 指标 | 数值 |
 |------|------|
-| 源文件数（.ts/.tsx） | 118 |
-| 代码行数 | 12,559 |
+| 源文件数（.ts/.tsx） | ~120 |
+| 代码行数 | ~13,700（+1,157 本次变更） |
 | 单元测试数 | 0 |
-| 验收测试方式 | curl 脚本手动验证 |
+| E2E 测试用例 | 7（浏览器手动验证，S1-S10 全覆盖） |
 | 前端应用数 | 3（V1/V2/V3） |
 | 后端服务数 | 4（V1/V2/V3/V4） |
 | 数据库表数 | 5 |
 | 端口占用 | V1=3100/3101, V2=3102/3103, V3=3104/3105, V4=3106 |
-| 种子数据 | 5 用户 / 5 备案 / 3 审批 |
+| 种子数据 | 5 用户 / 5 备案 / 5 审批 |
 
 ---
 
@@ -223,7 +228,8 @@
 - **AI 全部 Mock**：所有 AI 能力（预填、提取、风险评估、摘要、洞察、查询）均为 Mock 实现，未接入真实 LLM
 - **无真实认证**：使用 X-User-Id 请求头模拟用户身份，无 SSO/JWT/Session 机制
 - **共享数据库**：4 个版本共享同一 PostgreSQL 实例和同一套表，无数据隔离
-- **无配置化**：审批流、规则引擎、表单 Schema 均为代码硬编码，未实现 YAML/JSON 配置驱动
+- **审批组硬编码**：审批组配置（APPROVAL_GROUP_CONFIG）和邮件抄送名单（DEFAULT_EMAIL_CC_LIST）硬编码在常量中，预留配置化接口
+- **Provider Mock**：OrgProvider 从 users 表查询模拟组织架构，NotifyProvider 仅打印日志，未对接真实组织中心和飞书
 
 ### 9.2 功能局限
 

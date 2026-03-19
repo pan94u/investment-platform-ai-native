@@ -57,7 +57,7 @@ export class FeishuNotifyProvider implements NotifyProvider {
         `类型: ${payload.filingType}`,
         `金额: ${payload.amount}万元`,
         `发起人: ${payload.creatorName}`,
-        `审批级别: ${payload.level === 1 ? '直属上级' : '集团审批'}`,
+        `审批阶段: ${payload.stage}${payload.groupName ? `(${payload.groupName})` : ''} L${payload.level}`,
       ].join('\n');
 
       const data = await this.request('POST', '/task/v2/tasks', {

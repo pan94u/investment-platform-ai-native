@@ -23,11 +23,11 @@ const domainLabels: Record<string, string> = {
 };
 
 const typeLabels: Record<string, string> = {
-  direct_investment: '直投投资',
-  earnout_change: '对赌变更',
-  fund_exit: '基金投退出',
-  legal_entity_setup: '法人新设',
-  other_change: '其他变更',
+  equity_direct: '股权直投',
+  fund_project: '基金投项目',
+  fund_investment: '基金投资',
+  legal_entity: '法人新设',
+  other: '其他',
 };
 
 // ============================================================
@@ -110,7 +110,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     .select({ cnt: count() })
     .from(filings)
     .where(
-      sql`${filings.status} IN ('pending_level1', 'pending_level2')`
+      sql`${filings.status} IN ('pending_business', 'pending_group', 'pending_confirmation')`
     );
   const pendingCount = pendingResult[0]?.cnt ?? 0;
 
@@ -298,7 +298,7 @@ export async function getAnomalyDetection(): Promise<AnomalyDetection> {
     .from(filings)
     .where(
       and(
-        eq(filings.type, 'earnout_change'),
+        eq(filings.type, 'equity_direct'),
         gte(filings.createdAt, sql`NOW() - INTERVAL '12 months'`)
       )
     )
@@ -372,7 +372,7 @@ export async function getBaselineWarnings(): Promise<BaselineWarning[]> {
       createdAt: filings.createdAt,
     })
     .from(filings)
-    .where(eq(filings.type, 'earnout_change'))
+    .where(eq(filings.type, 'equity_direct'))
     .orderBy(filings.createdAt);
 
   // Group by project, find the earliest originalTarget and latest newTarget

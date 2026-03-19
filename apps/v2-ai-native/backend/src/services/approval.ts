@@ -69,16 +69,17 @@ export async function processApproval(approvalId: string, approverId: string, ac
       filingId: approval.filingId,
       approverId: groupApprovers[0].id,
       approverName: groupApprovers[0].name,
+      stage: 'group',
       level: 2,
       status: 'pending',
     });
 
     await db.update(filings).set({
-      status: 'pending_level2',
+      status: 'pending_group',
       updatedAt: now,
     }).where(eq(filings.id, approval.filingId));
 
-    return { status: 'pending_level2' };
+    return { status: 'pending_group' };
   }
 
   // 二级通过 → 备案完成

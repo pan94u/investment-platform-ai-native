@@ -1,22 +1,29 @@
 import type { User } from './user.js';
 
-/** 备案场景类型 */
+/** 备案一级场景（项目类型） */
 export type FilingType =
-  | 'direct_investment'      // 直投投资
-  | 'earnout_change'         // 对赌变更
-  | 'fund_exit'              // 基金投退出
-  | 'legal_entity_setup'     // 法人新设
-  | 'other_change';          // 其他投资要素变更
+  | 'equity_direct'        // 股权直投
+  | 'fund_project'         // 基金投项目
+  | 'fund_investment'      // 基金投资
+  | 'legal_entity'         // 法人新设
+  | 'other';               // 其它
+
+/** 项目阶段 */
+export type ProjectStage =
+  | 'invest'               // 新增投资 / 新设
+  | 'exit'                 // 退出
+  | 'change'               // 变更（对赌变更等）
+  | 'other';               // 其它
 
 /** 备案状态 */
 export type FilingStatus =
-  | 'draft'                  // 草稿
-  | 'submitted'              // 已提交
-  | 'pending_level1'         // 待直属上级审批
-  | 'pending_level2'         // 待集团审批
-  | 'approved'               // 已通过
-  | 'rejected'               // 已驳回
-  | 'completed';             // 已完成
+  | 'draft'                    // 草稿
+  | 'pending_business'         // 业务侧审批中（逐级上溯）
+  | 'pending_group'            // 集团审批组审批中
+  | 'pending_confirmation'     // 待最终确认
+  | 'completed'                // 已完成
+  | 'rejected'                 // 已驳回
+  | 'recalled';                // 已撤回
 
 /** 风险等级 (V3+) */
 export type RiskLevel = 'low' | 'medium' | 'high';
@@ -24,13 +31,22 @@ export type RiskLevel = 'low' | 'medium' | 'high';
 /** 投资领域 */
 export type Domain = 'smart_living' | 'industrial_finance' | 'health';
 
+/** 集团审批组名称 */
+export type ApprovalGroupName =
+  | 'finance'              // 集团财资
+  | 'hr'                   // 集团人力
+  | 'strategy'             // 集团战略
+  | 'legal'                // 集团法务
+  | 'audit';               // 集团审计
+
 /** 备案核心数据 */
 export interface Filing {
   readonly id: string;
   readonly filingNumber: string;          // BG 编号, e.g. BG20260301-005
   readonly type: FilingType;
-  readonly title: string;
-  readonly description: string;
+  readonly projectStage: ProjectStage;
+  readonly title: string;                 // 项目说明（一句话摘要）
+  readonly description: string;           // 备案具体事项
 
   // 项目信息
   readonly projectName: string;
@@ -51,6 +67,11 @@ export interface Filing {
   readonly newTarget: number | null;          // 新对赌目标（万元）
   readonly changeReason: string | null;       // 变更原因
 
+  // 流程相关
+  readonly approvalGroups: readonly ApprovalGroupName[];   // 发起人勾选的审批组
+  readonly emailRecipients: readonly string[];             // 备案邮件业务收件人（userId[]）
+  readonly confirmedBy: string | null;                     // 最终确认人 userId
+
   // 状态
   readonly status: FilingStatus;
   readonly riskLevel: RiskLevel | null;       // V3+ 风险评估
@@ -69,6 +90,7 @@ export interface Filing {
 /** 创建备案请求 */
 export interface CreateFilingRequest {
   readonly type: FilingType;
+  readonly projectStage: ProjectStage;
   readonly title: string;
   readonly description: string;
   readonly projectName: string;
@@ -82,6 +104,8 @@ export interface CreateFilingRequest {
   readonly originalTarget?: number;
   readonly newTarget?: number;
   readonly changeReason?: string;
+  readonly approvalGroups?: readonly ApprovalGroupName[];
+  readonly emailRecipients?: readonly string[];
 }
 
 /** 更新备案请求 */
@@ -90,6 +114,7 @@ export interface UpdateFilingRequest extends Partial<CreateFilingRequest> {}
 /** 备案查询参数 */
 export interface FilingQueryParams {
   readonly type?: FilingType;
+  readonly projectStage?: ProjectStage;
   readonly status?: FilingStatus;
   readonly domain?: Domain;
   readonly creatorId?: string;

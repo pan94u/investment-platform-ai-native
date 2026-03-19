@@ -15,8 +15,8 @@ filingsRouter.post('/', async (c) => {
   const user = c.get('user');
   const body = await c.req.json<CreateFilingRequest>();
 
-  if (!body.type || !body.title || !body.projectName || !body.domain || !body.industry || body.amount == null) {
-    return c.json({ success: false, data: null, error: '缺少必填字段' }, 400);
+  if (!body.type || !body.projectStage || !body.title || !body.projectName || !body.domain || !body.industry || body.amount == null) {
+    return c.json({ success: false, data: null, error: '缺少必填字段（type, projectStage, title, projectName, domain, industry, amount）' }, 400);
   }
 
   const filing = await filingService.createFiling(body, user.id, user.name);
@@ -27,6 +27,7 @@ filingsRouter.post('/', async (c) => {
 filingsRouter.get('/', async (c) => {
   const params: FilingQueryParams = {
     type: c.req.query('type') as FilingQueryParams['type'],
+    projectStage: c.req.query('projectStage') as FilingQueryParams['projectStage'],
     status: c.req.query('status') as FilingQueryParams['status'],
     domain: c.req.query('domain') as FilingQueryParams['domain'],
     creatorId: c.req.query('creatorId'),
@@ -41,23 +42,33 @@ filingsRouter.get('/', async (c) => {
   return c.json({ success: true, data: result, error: null });
 });
 
-/** GET /api/filings/approval-chain-preview — 预览审批链 */
+/** GET /api/filings/approval-chain-preview — 预览审批链（业务侧 + 集团侧 + 确认） */
 filingsRouter.get('/approval-chain-preview', async (c) => {
   const user = c.get('user');
   const domain = c.req.query('domain') || user.domain;
-  const filingType = c.req.query('filingType') || 'direct_investment';
+  const filingType = c.req.query('filingType') || 'equity_direct';
   const amount = c.req.query('amount') || '0';
+  const groupsParam = c.req.query('approvalGroups') || '';
 
   try {
     const orgProvider = getOrgProvider();
-    const chain = await orgProvider.getApproverChain({
+    const businessChain = await orgProvider.getBusinessApproverChain({
       creatorId: user.id,
       creatorDepartment: user.department,
       creatorDomain: domain,
       filingType,
       amount,
     });
-    return c.json({ success: true, data: chain, error: null });
+
+    const groupNames = groupsParam ? groupsParam.split(',').filter(Boolean) as import('@filing/shared').ApprovalGroupName[] : [];
+    const groupApprovers = groupNames.length > 0 ? await orgProvider.getGroupApprovers(groupNames) : [];
+    const confirmer = await orgProvider.getConfirmationApprover();
+
+    return c.json({
+      success: true,
+      data: { business: businessChain, group: groupApprovers, confirmation: confirmer },
+      error: null,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : '获取审批链失败';
     return c.json({ success: false, data: null, error: message }, 400);

@@ -140,16 +140,17 @@ approvalsRouter.post('/:id/approve', async (c) => {
       filingId: approval.filingId,
       approverId: groupApprovers[0].id,
       approverName: groupApprovers[0].name,
+      stage: 'group',
       level: 2,
       status: 'pending',
     });
 
     await db.update(filings).set({
-      status: 'pending_level2',
+      status: 'pending_group',
       updatedAt: now,
     }).where(eq(filings.id, approval.filingId));
 
-    newStatus = 'pending_level2';
+    newStatus = 'pending_group';
   } else {
     // 二级通过 → 备案完成
     await db.update(filings).set({

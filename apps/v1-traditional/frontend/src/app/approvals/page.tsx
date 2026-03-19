@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Nav } from '@/components/nav';
 import { api, getCurrentUser } from '@/lib/api';
-import { FILING_TYPE_LABELS, DOMAIN_LABELS } from '@/lib/constants';
+import { FILING_TYPE_LABELS, DOMAIN_LABELS, STAGE_LABELS, APPROVAL_GROUP_LABELS } from '@/lib/constants';
 import Link from 'next/link';
 
 type TodoItem = {
@@ -15,8 +15,11 @@ type TodoItem = {
   creatorName: string;
   domain: string;
   amount: string;
+  stage: string;
   level: number;
+  groupName: string | null;
   submittedAt: string;
+  approverName: string;
 };
 
 export default function ApprovalsPage() {
@@ -50,13 +53,15 @@ export default function ApprovalsPage() {
     }
   }, []);
 
-  async function handleAction(approvalId: string, action: 'approve' | 'reject') {
+  async function handleAction(approvalId: string, action: 'approve' | 'reject' | 'acknowledge') {
     setProcessing(approvalId);
     try {
       if (action === 'approve') {
         await api.approveApproval(approvalId, comment);
-      } else {
+      } else if (action === 'reject') {
         await api.rejectApproval(approvalId, comment);
+      } else {
+        await api.acknowledgeApproval(approvalId, comment);
       }
       setComment('');
       setActiveId(null);
@@ -179,8 +184,11 @@ export default function ApprovalsPage() {
                       />
                     </div>
 
-                    {/* Level accent */}
-                    <div className={`ml-3 w-1 shrink-0 ${todo.level === 1 ? 'bg-blue-500' : 'bg-violet-500'}`} />
+                    {/* Stage accent */}
+                    <div className={`ml-3 w-1 shrink-0 ${
+                      todo.stage === 'business' ? 'bg-blue-500' :
+                      todo.stage === 'group' ? 'bg-violet-500' : 'bg-green-500'
+                    }`} />
 
                     <div className="flex-1 p-5">
                       {/* Title & meta */}
@@ -200,11 +208,13 @@ export default function ApprovalsPage() {
                           </div>
                         </div>
                         <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
-                          todo.level === 1
-                            ? 'bg-blue-50 text-blue-600'
-                            : 'bg-violet-50 text-violet-600'
+                          todo.stage === 'business' ? 'bg-blue-50 text-blue-600' :
+                          todo.stage === 'group' ? 'bg-violet-50 text-violet-600' :
+                          'bg-green-50 text-green-600'
                         }`}>
-                          {todo.level === 1 ? '上级审批' : '集团审批'}
+                          {STAGE_LABELS[todo.stage] ?? todo.stage}
+                          {todo.groupName ? ` · ${APPROVAL_GROUP_LABELS[todo.groupName] ?? todo.groupName}` : ''}
+                          {todo.stage === 'business' ? ` L${todo.level}` : ''}
                         </span>
                       </div>
 
@@ -238,6 +248,13 @@ export default function ApprovalsPage() {
                               className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-600 disabled:opacity-50"
                             >
                               驳回
+                            </button>
+                            <button
+                              onClick={() => handleAction(todo.approvalId, 'acknowledge')}
+                              disabled={processing === todo.approvalId}
+                              className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100 disabled:opacity-50"
+                            >
+                              知悉
                             </button>
                             <button
                               onClick={() => { setActiveId(null); setComment(''); }}

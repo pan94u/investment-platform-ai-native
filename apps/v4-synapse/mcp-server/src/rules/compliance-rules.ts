@@ -64,7 +64,7 @@ function checkAmountValidation(data: FilingData): ComplianceViolation[] {
   }
 
   // 基金投退出金额上限：100000万（100亿）
-  if (data.type === 'fund_exit' && amount >= 100000) {
+  if (data.type === 'fund_project' && amount >= 100000) {
     violations.push({
       ruleId: 'filing-amount-validation',
       ruleName: '金额上限校验',

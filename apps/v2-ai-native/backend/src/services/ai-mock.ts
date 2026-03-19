@@ -30,7 +30,7 @@ export function generatePrefill(userMessage: string, projectName?: string): AIPr
     const isHaichuan = project.includes('海川');
     return {
       fields: {
-        type: 'earnout_change',
+        type: 'equity_direct',
         title: `${project}对赌目标调整备案`,
         description: isHaichuan
           ? '因市场环境变化及行业周期影响，海川项目原对赌业绩目标需进行合理调整，拟将2026年净利润目标从8000万元下调至6500万元。'
@@ -66,7 +66,7 @@ export function generatePrefill(userMessage: string, projectName?: string): AIPr
     const project = extractProjectName(msg) || projectName || '创新科技项目';
     return {
       fields: {
-        type: 'legal_entity_setup',
+        type: 'legal_entity',
         title: `${project}法人主体新设备案`,
         description: `拟为${project}新设项目法人主体，用于承接后续投资运营及合规管理需要。`,
         projectName: project,
@@ -97,7 +97,7 @@ export function generatePrefill(userMessage: string, projectName?: string): AIPr
     const amount = extractAmount(msg) || 30000;
     return {
       fields: {
-        type: 'direct_investment',
+        type: 'equity_direct',
         title: `${project}直接投资备案`,
         description: `拟对${project}进行直接股权投资，投资金额${amount}万元。`,
         projectName: project,
@@ -129,7 +129,7 @@ export function generatePrefill(userMessage: string, projectName?: string): AIPr
     const project = extractProjectName(msg) || projectName || '星辰基金';
     return {
       fields: {
-        type: 'fund_exit',
+        type: 'fund_project',
         title: `${project}退出备案`,
         description: `${project}拟进行投资退出操作，需提交备案审批。`,
         projectName: project,
@@ -156,7 +156,7 @@ export function generatePrefill(userMessage: string, projectName?: string): AIPr
   const project = extractProjectName(msg) || projectName || '待确认项目';
   return {
     fields: {
-      type: 'other_change',
+      type: 'other',
       title: `${project}投资要素变更备案`,
       description: userMessage,
       projectName: project,
@@ -193,7 +193,7 @@ export function extractFromDocument(filename: string, content?: string): Documen
     return {
       filename,
       extractedFields: {
-        type: 'direct_investment',
+        type: 'equity_direct',
         projectName: '海川项目',
         amount: 35000,
         investmentRatio: 20,
@@ -218,7 +218,7 @@ export function extractFromDocument(filename: string, content?: string): Documen
     return {
       filename,
       extractedFields: {
-        type: 'earnout_change',
+        type: 'equity_direct',
         projectName: '海川项目',
         originalTarget: 8000,
         newTarget: 6500,
@@ -242,7 +242,7 @@ export function extractFromDocument(filename: string, content?: string): Documen
     return {
       filename,
       extractedFields: {
-        type: 'legal_entity_setup',
+        type: 'legal_entity',
         legalEntityName: '海川智居科技有限公司',
         projectName: '海川项目',
         amount: 5000,
@@ -318,7 +318,7 @@ export function assessRisk(filing: any, history?: any[]): RiskAssessment {
   // 因子2: 场景类型
   const typeWeight = 20;
   totalWeight += typeWeight;
-  if (filing.type === 'earnout_change') {
+  if (filing.type === 'equity_direct') {
     factors.push({
       dimension: '场景类型',
       signal: 'medium',
@@ -327,7 +327,7 @@ export function assessRisk(filing: any, history?: any[]): RiskAssessment {
       weight: typeWeight,
     });
     totalScore += typeWeight * 0.6;
-  } else if (filing.type === 'fund_exit') {
+  } else if (filing.type === 'fund_project') {
     factors.push({
       dimension: '场景类型',
       signal: 'medium',
@@ -336,7 +336,7 @@ export function assessRisk(filing: any, history?: any[]): RiskAssessment {
       weight: typeWeight,
     });
     totalScore += typeWeight * 0.5;
-  } else if (filing.type === 'direct_investment') {
+  } else if (filing.type === 'equity_direct') {
     factors.push({
       dimension: '场景类型',
       signal: amount > 30000 ? 'high' : 'low',
@@ -361,8 +361,8 @@ export function assessRisk(filing: any, history?: any[]): RiskAssessment {
   // 因子3: 历史频次（对赌变更特有）
   const historyWeight = 20;
   totalWeight += historyWeight;
-  const earnoutCount = (history || []).filter((h: any) => h.type === 'earnout_change').length;
-  if (filing.type === 'earnout_change' && earnoutCount >= 2) {
+  const earnoutCount = (history || []).filter((h: any) => h.type === 'equity_direct').length;
+  if (filing.type === 'equity_direct' && earnoutCount >= 2) {
     factors.push({
       dimension: '历史频次',
       signal: 'high',
@@ -394,7 +394,7 @@ export function assessRisk(filing: any, history?: any[]): RiskAssessment {
   // 因子4: 估值合理性（直投特有）
   const valuationWeight = 15;
   totalWeight += valuationWeight;
-  if (filing.type === 'direct_investment' && filing.valuationAmount) {
+  if (filing.type === 'equity_direct' && filing.valuationAmount) {
     const valuation = Number(filing.valuationAmount);
     const ratio = Number(filing.investmentRatio) || 1;
     const impliedValuation = (amount / ratio) * 100;
@@ -475,25 +475,25 @@ export function generateSummary(filing: any, history?: any[]): ApprovalSummary {
 
   // 按类型生成摘要
   const typeLabels: Record<string, string> = {
-    direct_investment: '直投投资',
-    earnout_change: '对赌变更',
-    fund_exit: '基金退出',
-    legal_entity_setup: '法人新设',
-    other_change: '其他变更',
+    equity_direct: '股权直投',
+    fund_project: '基金投项目',
+    fund_investment: '基金投资',
+    legal_entity: '法人新设',
+    other: '其他变更',
   };
   const typeLabel = typeLabels[filing.type] || '投资备案';
 
   // 一句话摘要
   let oneLiner = '';
-  if (filing.type === 'earnout_change') {
+  if (filing.type === 'equity_direct') {
     const originalTarget = Number(filing.originalTarget) || 0;
     const newTarget = Number(filing.newTarget) || 0;
     const changePercent = originalTarget > 0 ? ((newTarget - originalTarget) / originalTarget * 100).toFixed(0) : 'N/A';
     oneLiner = `${filing.projectName}${typeLabel}：对赌目标从${originalTarget}万元调整至${newTarget}万元（${changePercent}%），变更金额${amountStr}。`;
-  } else if (filing.type === 'direct_investment') {
+  } else if (filing.type === 'equity_direct') {
     const ratio = filing.investmentRatio ? `占股${filing.investmentRatio}%` : '';
     oneLiner = `${filing.projectName}${typeLabel}：拟投资${amountStr}${ratio ? '，' + ratio : ''}。`;
-  } else if (filing.type === 'fund_exit') {
+  } else if (filing.type === 'fund_project') {
     oneLiner = `${filing.projectName}${typeLabel}：退出金额${amountStr}。`;
   } else {
     oneLiner = `${filing.projectName}${typeLabel}：金额${amountStr}。`;
@@ -506,10 +506,10 @@ export function generateSummary(filing: any, history?: any[]): ApprovalSummary {
     `涉及金额：${amountStr}`,
     `所属领域：${filing.domain === 'smart_living' ? '智慧生活' : filing.domain === 'industrial_finance' ? '产业金融' : '大健康'}`,
   ];
-  if (filing.type === 'earnout_change' && filing.changeReason) {
+  if (filing.type === 'equity_direct' && filing.changeReason) {
     keyPoints.push(`变更原因：${filing.changeReason}`);
   }
-  if (filing.type === 'direct_investment' && filing.valuationAmount) {
+  if (filing.type === 'equity_direct' && filing.valuationAmount) {
     keyPoints.push(`投前估值：${Number(filing.valuationAmount) >= 10000 ? `${(Number(filing.valuationAmount) / 10000).toFixed(1)}亿元` : `${filing.valuationAmount}万元`}`);
   }
 
@@ -518,11 +518,11 @@ export function generateSummary(filing: any, history?: any[]): ApprovalSummary {
   if (amount > 50000) {
     riskHighlights.push('大额投资（超5亿元），需集团重点审查');
   }
-  const earnoutHistory = (history || []).filter((h: any) => h.type === 'earnout_change');
+  const earnoutHistory = (history || []).filter((h: any) => h.type === 'equity_direct');
   if (earnoutHistory.length > 0) {
     riskHighlights.push(`该项目历史上已有 ${earnoutHistory.length} 次对赌变更记录`);
   }
-  if (filing.type === 'earnout_change') {
+  if (filing.type === 'equity_direct') {
     const originalTarget = Number(filing.originalTarget) || 0;
     const newTarget = Number(filing.newTarget) || 0;
     if (originalTarget > 0 && newTarget < originalTarget * 0.7) {
@@ -536,7 +536,7 @@ export function generateSummary(filing: any, history?: any[]): ApprovalSummary {
   // 历史关联
   const historicalContext: HistoricalItem[] = (history || []).slice(0, 5).map((h: any, i: number) => ({
     filingNumber: h.filingNumber || `BG2025XXXX-${String(i + 1).padStart(3, '0')}`,
-    type: h.type || 'other_change',
+    type: h.type || 'other',
     date: h.createdAt ? new Date(h.createdAt).toISOString().split('T')[0] : '2025-01-01',
     summary: h.title || `${filing.projectName}历史备案 #${i + 1}`,
   }));
@@ -619,7 +619,7 @@ export function checkBaseline(filing: any): ComplianceCheckResult {
   }
 
   // 对赌变更专有检查
-  if (filing.type === 'earnout_change') {
+  if (filing.type === 'equity_direct') {
     const hasOriginal = filing.originalTarget != null && Number(filing.originalTarget) > 0;
     const hasNew = filing.newTarget != null && Number(filing.newTarget) > 0;
     const hasReason = filing.changeReason && filing.changeReason.trim().length > 0;
@@ -645,7 +645,7 @@ export function checkBaseline(filing: any): ComplianceCheckResult {
   }
 
   // 直投专有检查
-  if (filing.type === 'direct_investment') {
+  if (filing.type === 'equity_direct') {
     const hasRatio = filing.investmentRatio != null && Number(filing.investmentRatio) > 0;
     checks.push({
       rule: '直投: 投资比例',
@@ -725,8 +725,8 @@ export function answerQuery(question: string, stats?: any): QueryResult {
         totalAmount,
         byStatus: stats?.byStatus ?? [
           { status: 'draft', count: 3 },
-          { status: 'pending_level1', count: 3 },
-          { status: 'pending_level2', count: 2 },
+          { status: 'pending_business', count: 3 },
+          { status: 'pending_group', count: 2 },
           { status: 'completed', count: 7 },
         ],
       },
@@ -749,8 +749,8 @@ export function answerQuery(question: string, stats?: any): QueryResult {
         filingCount: 3,
         totalAmount: 45000,
         latestFiling: {
-          type: 'earnout_change',
-          status: 'pending_level2',
+          type: 'equity_direct',
+          status: 'pending_group',
           amount: 6500,
         },
       },

@@ -49,6 +49,20 @@ approvalsRouter.post('/:id/reject', async (c) => {
   }
 });
 
+/** POST /api/approvals/:id/acknowledge — 知悉 */
+approvalsRouter.post('/:id/acknowledge', async (c) => {
+  const user = c.get('user');
+  const body = await c.req.json<{ comment?: string }>().catch(() => ({} as { comment?: string }));
+
+  try {
+    const result = await approvalService.processApproval(c.req.param('id'), user.id, 'acknowledge', body.comment, user.name);
+    return c.json({ success: true, data: result, error: null });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '知悉操作失败';
+    return c.json({ success: false, data: null, error: message }, 400);
+  }
+});
+
 /** PUT /api/approvals/:id/reassign — 管理员改派 */
 approvalsRouter.put('/:id/reassign', requireRole('admin'), async (c) => {
   const user = c.get('user');

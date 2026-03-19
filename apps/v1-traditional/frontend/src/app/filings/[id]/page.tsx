@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Nav } from '@/components/nav';
 import { api, getCurrentUser } from '@/lib/api';
-import { FILING_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS, DOMAIN_LABELS } from '@/lib/constants';
+import { FILING_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS, DOMAIN_LABELS, PROJECT_STAGE_LABELS, APPROVAL_GROUP_LABELS, STAGE_LABELS } from '@/lib/constants';
 
 export default function FilingDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -106,6 +106,7 @@ export default function FilingDetailPage() {
         <Section title="基本信息">
           <dl className="grid grid-cols-2 gap-x-8 gap-y-5">
             <Info label="备案类型" value={FILING_TYPE_LABELS[filing.type as string] ?? ''} />
+            <Info label="项目阶段" value={PROJECT_STAGE_LABELS[filing.projectStage as string] ?? ''} />
             <Info label="投资领域" value={DOMAIN_LABELS[filing.domain as string] ?? ''} />
             <Info label="项目名称" value={filing.projectName as string} />
             <Info label="产业" value={filing.industry as string} />
@@ -154,11 +155,14 @@ export default function FilingDetailPage() {
                 {approvalHistory.map((a) => {
                   const status = a.status as string;
                   const dotColor =
-                    status === 'approved'
+                    status === 'approved' || status === 'acknowledged'
                       ? 'bg-emerald-500'
                       : status === 'rejected'
                         ? 'bg-red-500'
                         : 'bg-amber-400';
+
+                  const stageLabel = STAGE_LABELS[a.stage as string] ?? (a.stage as string);
+                  const groupLabel = a.groupName ? ` · ${APPROVAL_GROUP_LABELS[a.groupName as string] ?? a.groupName}` : '';
 
                   return (
                     <div key={a.id as string} className="relative flex gap-4 pl-6">
@@ -169,22 +173,18 @@ export default function FilingDetailPage() {
                             {a.approverName as string}
                           </span>
                           <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-400">
-                            {a.level === 1 ? '直属上级' : '集团审批'}
+                            {stageLabel}{groupLabel}
                           </span>
                           <span
                             className={`text-xs font-medium ${
-                              status === 'approved'
-                                ? 'text-emerald-600'
-                                : status === 'rejected'
-                                  ? 'text-red-500'
-                                  : 'text-amber-600'
+                              status === 'approved' ? 'text-emerald-600' :
+                              status === 'acknowledged' ? 'text-blue-600' :
+                              status === 'rejected' ? 'text-red-500' : 'text-amber-600'
                             }`}
                           >
-                            {status === 'approved'
-                              ? '已同意'
-                              : status === 'rejected'
-                                ? '已驳回'
-                                : '待审批'}
+                            {status === 'approved' ? '已同意' :
+                             status === 'acknowledged' ? '已知悉' :
+                             status === 'rejected' ? '已驳回' : '待审批'}
                           </span>
                         </div>
                         {a.comment ? (

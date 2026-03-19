@@ -1,4 +1,5 @@
-import type { FilingStatus, ApprovalStatus } from '../types/index.js';
+import type { FilingStatus } from '../types/index.js';
+import type { ApprovalStatus } from '../types/approval.js';
 
 /** 备案状态配置 */
 export const FILING_STATUS_CONFIG: Record<FilingStatus, {
@@ -6,12 +7,12 @@ export const FILING_STATUS_CONFIG: Record<FilingStatus, {
   readonly color: string;
 }> = {
   draft: { label: '草稿', color: 'gray' },
-  submitted: { label: '已提交', color: 'blue' },
-  pending_level1: { label: '待上级审批', color: 'orange' },
-  pending_level2: { label: '待集团审批', color: 'orange' },
-  approved: { label: '已通过', color: 'green' },
-  rejected: { label: '已驳回', color: 'red' },
+  pending_business: { label: '业务审批中', color: 'orange' },
+  pending_group: { label: '集团审批中', color: 'orange' },
+  pending_confirmation: { label: '待最终确认', color: 'blue' },
   completed: { label: '已完成', color: 'green' },
+  rejected: { label: '已驳回', color: 'red' },
+  recalled: { label: '已撤回', color: 'gray' },
 } as const;
 
 /** 审批状态配置 */
@@ -22,4 +23,5 @@ export const APPROVAL_STATUS_CONFIG: Record<ApprovalStatus, {
   pending: { label: '待审批', color: 'orange' },
   approved: { label: '已同意', color: 'green' },
   rejected: { label: '已驳回', color: 'red' },
+  acknowledged: { label: '已知悉', color: 'blue' },
 } as const;

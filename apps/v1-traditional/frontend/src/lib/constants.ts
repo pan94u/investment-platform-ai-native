@@ -1,30 +1,44 @@
 export const FILING_TYPE_LABELS: Record<string, string> = {
-  direct_investment: '直投投资',
-  earnout_change: '对赌变更',
-  fund_exit: '基金投退出',
-  legal_entity_setup: '法人新设',
-  other_change: '其他投资要素变更',
+  equity_direct: '股权直投',
+  fund_project: '基金投项目',
+  fund_investment: '基金投资',
+  legal_entity: '法人新设',
+  other: '其它',
+};
+
+export const PROJECT_STAGE_LABELS: Record<string, string> = {
+  invest: '新增投资',
+  exit: '项目退出',
+  change: '变更',
+  other: '其它',
+};
+
+/** 每种项目类型允许的阶段 */
+export const TYPE_ALLOWED_STAGES: Record<string, string[]> = {
+  equity_direct: ['invest', 'change', 'exit'],
+  fund_project: ['invest', 'change'],
+  fund_investment: ['invest', 'exit'],
+  legal_entity: ['invest'],
+  other: ['invest', 'change', 'exit', 'other'],
 };
 
 export const STATUS_LABELS: Record<string, string> = {
   draft: '草稿',
-  submitted: '已提交',
-  pending_level1: '待上级审批',
-  pending_level2: '待集团审批',
-  approved: '已通过',
-  rejected: '已驳回',
+  pending_business: '业务审批中',
+  pending_group: '集团审批中',
+  pending_confirmation: '待最终确认',
   completed: '已完成',
+  rejected: '已驳回',
   recalled: '已撤回',
 };
 
 export const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-700',
-  submitted: 'bg-blue-100 text-blue-700',
-  pending_level1: 'bg-orange-100 text-orange-700',
-  pending_level2: 'bg-orange-100 text-orange-700',
-  approved: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-700',
+  pending_business: 'bg-orange-100 text-orange-700',
+  pending_group: 'bg-orange-100 text-orange-700',
+  pending_confirmation: 'bg-blue-100 text-blue-700',
   completed: 'bg-green-100 text-green-700',
+  rejected: 'bg-red-100 text-red-700',
   recalled: 'bg-slate-100 text-slate-600',
 };
 
@@ -32,4 +46,20 @@ export const DOMAIN_LABELS: Record<string, string> = {
   smart_living: '智慧住居',
   industrial_finance: '产业金融',
   health: '大健康',
+};
+
+export const APPROVAL_GROUP_LABELS: Record<string, string> = {
+  finance: '集团财资',
+  hr: '集团人力',
+  strategy: '集团战略',
+  legal: '集团法务',
+  audit: '集团审计',
+};
+
+export const APPROVAL_GROUPS = ['finance', 'hr', 'strategy', 'legal', 'audit'] as const;
+
+export const STAGE_LABELS: Record<string, string> = {
+  business: '业务审批',
+  group: '集团审批',
+  confirmation: '最终确认',
 };

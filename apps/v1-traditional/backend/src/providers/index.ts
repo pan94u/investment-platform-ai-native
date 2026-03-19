@@ -22,4 +22,8 @@ export function getNotifyProvider(): NotifyProvider {
   return notifySingleton;
 }
 
-export type { OrgProvider, NotifyProvider, TodoPayload, ApproverChainContext, ApproverInfo } from './types.js';
+export type {
+  OrgProvider, NotifyProvider, TodoPayload,
+  ApproverChainContext, ApproverInfo,
+  GroupApproverInfo, ConfirmationInfo,
+} from './types.js';

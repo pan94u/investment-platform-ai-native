@@ -65,6 +65,8 @@ export const api = {
     request<Record<string, unknown>>(`/approvals/${id}/approve`, { method: 'POST', body: JSON.stringify({ comment }) }),
   rejectApproval: (id: string, comment?: string) =>
     request<Record<string, unknown>>(`/approvals/${id}/reject`, { method: 'POST', body: JSON.stringify({ comment }) }),
+  acknowledgeApproval: (id: string, comment?: string) =>
+    request<Record<string, unknown>>(`/approvals/${id}/acknowledge`, { method: 'POST', body: JSON.stringify({ comment }) }),
   getApprovalHistory: (filingId: string) => request<unknown[]>(`/approvals/history/${filingId}`),
   reassignApproval: (id: string, newApproverId: string, reason?: string) =>
     request<Record<string, unknown>>(`/approvals/${id}/reassign`, { method: 'PUT', body: JSON.stringify({ newApproverId, reason }) }),
@@ -72,9 +74,13 @@ export const api = {
     request<Record<string, unknown>>('/approvals/batch-approve', { method: 'POST', body: JSON.stringify({ approvalIds, comment }) }),
 
   // Approval chain preview
-  getApprovalChainPreview: (params?: { domain?: string; filingType?: string; amount?: string }) => {
+  getApprovalChainPreview: (params?: { domain?: string; filingType?: string; amount?: string; approvalGroups?: string }) => {
     const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString() : '';
-    return request<Array<{ userId: string; name: string; level: number }>>(`/filings/approval-chain-preview${qs}`);
+    return request<{
+      business: Array<{ userId: string; name: string; level: number }>;
+      group: Array<{ userId: string; name: string; groupName: string }>;
+      confirmation: { userId: string; name: string };
+    }>(`/filings/approval-chain-preview${qs}`);
   },
 
   // Dashboard

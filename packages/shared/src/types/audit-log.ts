@@ -4,6 +4,7 @@ export type AuditAction =
   | 'filing_updated'
   | 'filing_submitted'
   | 'filing_approved'
+  | 'filing_acknowledged'
   | 'filing_rejected'
   | 'filing_recalled'
   | 'approval_reassigned'

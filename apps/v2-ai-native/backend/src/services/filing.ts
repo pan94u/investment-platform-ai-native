@@ -50,7 +50,8 @@ export async function createFilingFromAI(prefillResult: AIPrefillResult, creator
   const fields = prefillResult.fields as Record<string, any>;
 
   const data: CreateFilingRequest = {
-    type: fields.type || 'other_change',
+    type: fields.type || 'other',
+    projectStage: fields.projectStage || 'invest',
     title: fields.title || '待确认备案',
     description: fields.description || '',
     projectName: fields.projectName || '待确认项目',
@@ -179,6 +180,7 @@ export async function submitFiling(filingId: string, userId: string) {
     filingId,
     approverId: supervisors[0].id,
     approverName: supervisors[0].name,
+    stage: 'business',
     level: 1,
     status: 'pending',
   });
@@ -186,7 +188,7 @@ export async function submitFiling(filingId: string, userId: string) {
   // 更新备案状态
   const [updated] = await db
     .update(filings)
-    .set({ status: 'pending_level1', submittedAt: now, updatedAt: now })
+    .set({ status: 'pending_business', submittedAt: now, updatedAt: now })
     .where(eq(filings.id, filingId))
     .returning();
 

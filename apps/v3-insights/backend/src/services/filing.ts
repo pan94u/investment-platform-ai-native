@@ -155,6 +155,7 @@ export async function submitFiling(filingId: string, userId: string) {
     filingId,
     approverId: supervisors[0].id,
     approverName: supervisors[0].name,
+    stage: 'business',
     level: 1,
     status: 'pending',
   });
@@ -162,7 +163,7 @@ export async function submitFiling(filingId: string, userId: string) {
   // 更新备案状态
   const [updated] = await db
     .update(filings)
-    .set({ status: 'pending_level1', submittedAt: now, updatedAt: now })
+    .set({ status: 'pending_business', submittedAt: now, updatedAt: now })
     .where(eq(filings.id, filingId))
     .returning();
 

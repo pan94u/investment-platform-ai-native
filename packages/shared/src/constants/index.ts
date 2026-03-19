@@ -1,3 +1,8 @@
-export { FILING_TYPE_CONFIG, FILING_TYPES } from './filing-types.js';
+export {
+  FILING_TYPE_CONFIG, FILING_TYPES,
+  PROJECT_STAGE_CONFIG, PROJECT_STAGES,
+  APPROVAL_GROUP_CONFIG, APPROVAL_GROUPS,
+  DEFAULT_EMAIL_CC_LIST,
+} from './filing-types.js';
 export { FILING_STATUS_CONFIG, APPROVAL_STATUS_CONFIG } from './status.js';
 export { DOMAIN_CONFIG, DOMAINS } from './domains.js';

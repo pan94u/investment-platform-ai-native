@@ -269,11 +269,11 @@ export function getRiskAssessmentAudit(filingData: {
 
   // 因子 2：备案类型
   const typeScores: Record<string, number> = {
-    direct_investment: 60,
-    earnout_change: 50,
-    fund_exit: 40,
-    legal_entity_setup: 30,
-    other_change: 20,
+    equity_direct: 60,
+    fund_project: 50,
+    fund_investment: 40,
+    legal_entity: 30,
+    other: 20,
   };
   const typeScore = typeScores[filingData.type ?? ''] ?? 30;
   factors.push({
