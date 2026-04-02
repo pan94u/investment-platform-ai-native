@@ -8,6 +8,7 @@ export const users = pgTable('users', {
   role: varchar('role', { length: 20 }).notNull(),            // initiator | supervisor | group_approver | admin | viewer
   department: varchar('department', { length: 100 }).notNull(),
   domain: varchar('domain', { length: 50 }).notNull(),         // smart_living | industrial_finance | health
+  email: varchar('email', { length: 200 }),                    // nullable
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

@@ -6,6 +6,14 @@ import { generateId, generateFilingNumber } from '../lib/id.js';
 import { getOrgProvider, getNotifyProvider } from '../providers/index.js';
 import * as auditService from './audit.js';
 
+/** 自动生成项目编号 YYYY-MM-DD-NNN */
+function generateProjectCode(): string {
+  const now = new Date();
+  const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const rand = String(Math.floor(Math.random() * 900) + 100);
+  return `${date}-${rand}`;
+}
+
 /** 获取下一个备案序号 */
 async function getNextSeq(): Promise<number> {
   const today = new Date();
@@ -22,6 +30,9 @@ export async function createFiling(data: CreateFilingRequest, creatorId: string,
   const seq = await getNextSeq();
   const id = generateId('filing');
   const filingNumber = generateFilingNumber(seq);
+
+  // 项目编号: 前端传入 or 自动生成 YYYY-MM-DD-NNN
+  const projectCode = data.projectCode ?? generateProjectCode();
 
   const [filing] = await db.insert(filings).values({
     id,
@@ -43,6 +54,7 @@ export async function createFiling(data: CreateFilingRequest, creatorId: string,
     changeReason: data.changeReason ?? null,
     approvalGroups: (data.approvalGroups as string[]) ?? [],
     emailRecipients: (data.emailRecipients as string[]) ?? [],
+    projectCode,
     status: 'draft',
     creatorId,
   }).returning();
@@ -84,6 +96,7 @@ export async function updateFiling(id: string, data: UpdateFilingRequest, userId
   if (data.changeReason !== undefined) updateData.changeReason = data.changeReason;
   if (data.approvalGroups !== undefined) updateData.approvalGroups = data.approvalGroups;
   if (data.emailRecipients !== undefined) updateData.emailRecipients = data.emailRecipients;
+  if (data.projectCode !== undefined) updateData.projectCode = data.projectCode;
 
   const [updated] = await db.update(filings).set(updateData).where(eq(filings.id, id)).returning();
 
@@ -289,10 +302,10 @@ export async function recallFiling(filingId: string, userId: string, userName: s
     }
   }
 
-  // 更新备案状态
+  // 撤回到草稿状态（发起人可重新编辑提交），审批记录保留
   const [updated] = await db
     .update(filings)
-    .set({ status: 'recalled', updatedAt: now })
+    .set({ status: 'draft', submittedAt: null, updatedAt: now })
     .where(eq(filings.id, filingId))
     .returning();
 

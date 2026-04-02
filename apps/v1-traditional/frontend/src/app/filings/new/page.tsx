@@ -1,8 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Nav } from '@/components/nav';
+import { FileUpload } from '@/components/file-upload';
+import type { FileUploadHandle } from '@/components/file-upload';
+import { RichTextEditor } from '@/components/rich-text-editor';
+import { ProjectAutocomplete } from '@/components/project-autocomplete';
 import { api, getCurrentUser } from '@/lib/api';
 import {
   FILING_TYPE_LABELS, PROJECT_STAGE_LABELS, TYPE_ALLOWED_STAGES,
@@ -47,12 +51,14 @@ type ChainPreview = {
 export default function NewFilingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const fileUploadRef = useRef<FileUploadHandle>(null);
   const [form, setForm] = useState({
     type: '',
     projectStage: '',
     title: '',
     description: '',
     projectName: '',
+    projectCode: '',
     legalEntityName: '',
     domain: '',
     industry: '',
@@ -63,6 +69,7 @@ export default function NewFilingPage() {
     newTarget: '',
     changeReason: '',
     approvalGroups: [] as string[],
+    emailRecipients: [] as string[],
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -122,7 +129,9 @@ export default function NewFilingPage() {
         industry: form.industry,
         amount: Number(form.amount),
         approvalGroups: form.approvalGroups,
+        emailRecipients: form.emailRecipients,
       };
+      if (form.projectCode) data.projectCode = form.projectCode;
       if (form.legalEntityName) data.legalEntityName = form.legalEntityName;
       if (form.investmentRatio) data.investmentRatio = Number(form.investmentRatio);
       if (form.valuationAmount) data.valuationAmount = Number(form.valuationAmount);
@@ -130,11 +139,20 @@ export default function NewFilingPage() {
       if (form.newTarget) data.newTarget = Number(form.newTarget);
       if (form.changeReason) data.changeReason = form.changeReason;
 
+      // 1. 创建 filing
       const filing = await api.createFiling(data);
-      if (andSubmit) {
-        await api.submitFiling(filing.id as string);
+      const filingId = filing.id as string;
+
+      // 2. 上传暂存的附件
+      if (fileUploadRef.current) {
+        await fileUploadRef.current.uploadPendingFiles(filingId);
       }
-      router.push('/filings');
+
+      // 3. 提交或跳转
+      if (andSubmit) {
+        await api.submitFiling(filingId);
+      }
+      router.push(andSubmit ? '/filings' : `/filings/${filingId}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存失败');
     } finally {
@@ -228,7 +246,18 @@ export default function NewFilingPage() {
                 <input value={form.title} onChange={(e) => update('title', e.target.value)} className="form-input" placeholder="一句话摘要，如：海川项目首次投资" />
               </Field>
               <Field label="项目名称" required>
-                <input value={form.projectName} onChange={(e) => update('projectName', e.target.value)} className="form-input" placeholder="请输入项目名称" />
+                <ProjectAutocomplete
+                  filingType={form.type}
+                  value={form.projectName}
+                  onChange={(name, code) => {
+                    update('projectName', name);
+                    if (code) update('projectCode', code);
+                  }}
+                  placeholder="输入或选择项目名称"
+                />
+              </Field>
+              <Field label="项目编号">
+                <input value={form.projectCode} onChange={(e) => update('projectCode', e.target.value)} className="form-input" placeholder="自动生成或从战投系统带入" />
               </Field>
               <Field label="法人主体">
                 <input value={form.legalEntityName} onChange={(e) => update('legalEntityName', e.target.value)} className="form-input" placeholder="请输入法人主体名称" />
@@ -284,8 +313,16 @@ export default function NewFilingPage() {
               )}
 
               <Field label="备案具体事项">
-                <textarea value={form.description} onChange={(e) => update('description', e.target.value)} className="form-input min-h-[72px] resize-none"
-                  placeholder="请清晰、完整、规范填写本次需备案的核心内容" />
+                <RichTextEditor
+                  value={form.description}
+                  onChange={(html) => update('description', html)}
+                  placeholder="请清晰、完整、规范填写本次需备案的核心内容"
+                />
+              </Field>
+
+              {/* 备案文件 */}
+              <Field label="备案文件">
+                <FileUpload ref={fileUploadRef} />
               </Field>
 
               {/* 审批组勾选 */}

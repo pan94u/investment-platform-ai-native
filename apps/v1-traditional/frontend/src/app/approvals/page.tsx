@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Nav } from '@/components/nav';
+import { EmailPreviewModal } from '@/components/email-preview-modal';
 import { api, getCurrentUser } from '@/lib/api';
 import { FILING_TYPE_LABELS, DOMAIN_LABELS, STAGE_LABELS, APPROVAL_GROUP_LABELS } from '@/lib/constants';
 import Link from 'next/link';
@@ -33,6 +34,7 @@ export default function ApprovalsPage() {
   const [reassignId, setReassignId] = useState<string | null>(null);
   const [reassignTarget, setReassignTarget] = useState('');
   const [reassignReason, setReassignReason] = useState('');
+  const [emailPreviewTarget, setEmailPreviewTarget] = useState<{ approvalId: string; filingId: string } | null>(null);
   const [users, setUsers] = useState<Array<{ id: string; name: string }>>([]);
 
   function loadTodos() {
@@ -54,6 +56,15 @@ export default function ApprovalsPage() {
   }, []);
 
   async function handleAction(approvalId: string, action: 'approve' | 'reject' | 'acknowledge') {
+    // confirmation 阶段同意 → 弹出邮件预览
+    if (action === 'approve') {
+      const todo = todos.find(t => t.approvalId === approvalId);
+      if (todo?.stage === 'confirmation') {
+        setEmailPreviewTarget({ approvalId, filingId: todo.filingId });
+        return;
+      }
+    }
+
     setProcessing(approvalId);
     try {
       if (action === 'approve') {
@@ -320,6 +331,20 @@ export default function ApprovalsPage() {
               );
             })}
           </div>
+        )}
+        {emailPreviewTarget && (
+          <EmailPreviewModal
+            filingId={emailPreviewTarget.filingId}
+            approvalId={emailPreviewTarget.approvalId}
+            comment={comment}
+            onClose={() => setEmailPreviewTarget(null)}
+            onSuccess={() => {
+              setEmailPreviewTarget(null);
+              setComment('');
+              setActiveId(null);
+              loadTodos();
+            }}
+          />
         )}
       </main>
     </div>

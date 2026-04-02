@@ -2,9 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Nav } from '@/components/nav';
+import { FileUpload } from '@/components/file-upload';
+import { RichTextDisplay } from '@/components/rich-text-editor';
+import { EmailPreviewModal } from '@/components/email-preview-modal';
 import { api, getCurrentUser } from '@/lib/api';
 import { FILING_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS, DOMAIN_LABELS, PROJECT_STAGE_LABELS, APPROVAL_GROUP_LABELS, STAGE_LABELS } from '@/lib/constants';
+
+type PendingApproval = {
+  approvalId: string;
+  stage: string;
+  level: number;
+  groupName: string | null;
+};
 
 export default function FilingDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -12,19 +23,43 @@ export default function FilingDetailPage() {
   const [filing, setFiling] = useState<Record<string, unknown> | null>(null);
   const [approvalHistory, setApprovalHistory] = useState<Array<Record<string, unknown>>>([]);
   const [loading, setLoading] = useState(true);
+  const [myPending, setMyPending] = useState<PendingApproval | null>(null);
+  const [approvalComment, setApprovalComment] = useState('');
+  const [approvalProcessing, setApprovalProcessing] = useState(false);
+  const [emailPreviewOpen, setEmailPreviewOpen] = useState(false);
 
-  useEffect(() => {
+  const user = getCurrentUser();
+
+  function loadData() {
+    setLoading(true);
     Promise.all([api.getFiling(id), api.getApprovalHistory(id)])
       .then(([f, h]) => {
         setFiling(f);
         setApprovalHistory(h as Array<Record<string, unknown>>);
+
+        // 查找当前用户在这个 filing 上的 pending 审批
+        const history = h as Array<Record<string, unknown>>;
+        const pending = history.find(
+          (a) => a.status === 'pending' && a.approverId === user?.id
+        );
+        if (pending) {
+          setMyPending({
+            approvalId: pending.id as string,
+            stage: pending.stage as string,
+            level: pending.level as number,
+            groupName: pending.groupName as string | null,
+          });
+        } else {
+          setMyPending(null);
+        }
       })
       .finally(() => setLoading(false));
-  }, [id]);
+  }
+
+  useEffect(() => { loadData(); }, [id]);
 
   async function handleSubmit() {
     await api.submitFiling(id);
-    router.refresh();
     window.location.reload();
   }
 
@@ -32,6 +67,34 @@ export default function FilingDetailPage() {
     if (!confirm('确认撤回此备案？撤回后可重新编辑提交。')) return;
     await api.recallFiling(id);
     window.location.reload();
+  }
+
+  async function handleApprovalAction(action: 'approve' | 'reject' | 'acknowledge') {
+    if (!myPending) return;
+
+    // confirmation 阶段同意 → 弹邮件预览
+    if (action === 'approve' && myPending.stage === 'confirmation') {
+      setEmailPreviewOpen(true);
+      return;
+    }
+
+    setApprovalProcessing(true);
+    try {
+      if (action === 'approve') {
+        await api.approveApproval(myPending.approvalId, approvalComment);
+      } else if (action === 'reject') {
+        await api.rejectApproval(myPending.approvalId, approvalComment);
+      } else {
+        await api.acknowledgeApproval(myPending.approvalId, approvalComment);
+      }
+      setApprovalComment('');
+      setMyPending(null);
+      loadData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '操作失败');
+    } finally {
+      setApprovalProcessing(false);
+    }
   }
 
   if (loading) {
@@ -56,10 +119,11 @@ export default function FilingDetailPage() {
     );
   }
 
-  const user = getCurrentUser();
   const canSubmit = filing.status === 'draft' && filing.creatorId === user?.id;
   const canRecall = (filing.status as string)?.startsWith('pending_') && filing.creatorId === user?.id;
   const creator = filing.creator as Record<string, unknown>;
+  const description = (filing.description as string) ?? '';
+  const isHtml = description.includes('<') && description.includes('>');
 
   return (
     <div className="min-h-screen bg-[#FAFAF9]">
@@ -80,16 +144,25 @@ export default function FilingDetailPage() {
             </div>
             <p className="mt-1 text-sm text-gray-400">
               {filing.filingNumber as string}
+              {filing.projectCode ? ` · 项目编号: ${filing.projectCode}` : ''}
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
             {canSubmit && (
-              <button
-                onClick={handleSubmit}
-                className="rounded-md bg-[#0066CC] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#0055AA]"
-              >
-                提交审批
-              </button>
+              <>
+                <Link
+                  href={`/filings/${id}/edit`}
+                  className="rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition hover:border-[#0066CC] hover:text-[#0066CC]"
+                >
+                  编辑
+                </Link>
+                <button
+                  onClick={handleSubmit}
+                  className="rounded-md bg-[#0066CC] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#0055AA]"
+                >
+                  提交审批
+                </button>
+              </>
             )}
             {canRecall && (
               <button
@@ -102,6 +175,57 @@ export default function FilingDetailPage() {
           </div>
         </div>
 
+        {/* 审批操作区（当前用户有 pending 审批时显示） */}
+        {myPending && (
+          <div className="card mb-4 border-l-4 border-l-[#0066CC] p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0066CC] text-xs font-bold text-white">!</div>
+              <h2 className="text-base font-semibold text-gray-800">待您审批</h2>
+              <span className={`badge ml-1 ${
+                myPending.stage === 'business' ? 'bg-blue-50 text-blue-600' :
+                myPending.stage === 'group' ? 'bg-violet-50 text-violet-600' :
+                'bg-emerald-50 text-emerald-600'
+              }`}>
+                {STAGE_LABELS[myPending.stage] ?? myPending.stage}
+                {myPending.groupName ? ` · ${APPROVAL_GROUP_LABELS[myPending.groupName] ?? myPending.groupName}` : ''}
+                {myPending.stage === 'business' ? ` L${myPending.level}` : ''}
+              </span>
+            </div>
+
+            <textarea
+              value={approvalComment}
+              onChange={(e) => setApprovalComment(e.target.value)}
+              placeholder="审批意见（选填）"
+              className="form-input min-h-[64px] resize-none text-sm"
+              rows={2}
+            />
+
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                onClick={() => handleApprovalAction('approve')}
+                disabled={approvalProcessing}
+                className="rounded-md bg-[#0066CC] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#0055AA] disabled:opacity-50"
+              >
+                {myPending.stage === 'confirmation' ? '确认' : '同意'}
+              </button>
+              <button
+                onClick={() => handleApprovalAction('reject')}
+                disabled={approvalProcessing}
+                className="rounded-md border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+              >
+                驳回
+              </button>
+              <button
+                onClick={() => handleApprovalAction('acknowledge')}
+                disabled={approvalProcessing}
+                className="rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+              >
+                知悉
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Info */}
         <Section title="基本信息">
           <dl className="grid grid-cols-2 gap-x-8 gap-y-5">
@@ -109,6 +233,7 @@ export default function FilingDetailPage() {
             <Info label="项目阶段" value={PROJECT_STAGE_LABELS[filing.projectStage as string] ?? ''} />
             <Info label="投资领域" value={DOMAIN_LABELS[filing.domain as string] ?? ''} />
             <Info label="项目名称" value={filing.projectName as string} />
+            {filing.projectCode ? <Info label="项目编号" value={filing.projectCode as string} /> : null}
             <Info label="产业" value={filing.industry as string} />
             <Info label="金额" value={`${Number(filing.amount).toLocaleString()} 万元`} highlight />
             {filing.legalEntityName ? <Info label="法人主体" value={filing.legalEntityName as string} /> : null}
@@ -117,8 +242,24 @@ export default function FilingDetailPage() {
             {filing.originalTarget ? <Info label="原对赌目标" value={`${Number(filing.originalTarget).toLocaleString()} 万元`} /> : null}
             {filing.newTarget ? <Info label="新对赌目标" value={`${Number(filing.newTarget).toLocaleString()} 万元`} /> : null}
             {filing.changeReason ? <Info label="变更原因" value={filing.changeReason as string} span2 /> : null}
-            {filing.description ? <Info label="备注" value={filing.description as string} span2 /> : null}
+            {filing.filingTime ? <Info label="备案时间" value={new Date(filing.filingTime as string).toLocaleString('zh-CN')} /> : null}
           </dl>
+        </Section>
+
+        {/* 备案具体事项 */}
+        {description && (
+          <Section title="备案具体事项">
+            {isHtml ? (
+              <RichTextDisplay html={description} />
+            ) : (
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{description}</p>
+            )}
+          </Section>
+        )}
+
+        {/* 备案文件 */}
+        <Section title="备案文件">
+          <FileUpload filingId={id} readonly={filing.status !== 'draft' || filing.creatorId !== user?.id} />
         </Section>
 
         {/* Creator */}
@@ -148,9 +289,7 @@ export default function FilingDetailPage() {
         {approvalHistory.length > 0 && (
           <Section title="审批记录">
             <div className="relative ml-0.5">
-              {/* Vertical line */}
               <div className="absolute left-[3.5px] top-2 bottom-2 w-px bg-gray-200" />
-
               <div className="space-y-4">
                 {approvalHistory.map((a) => {
                   const status = a.status as string;
@@ -204,6 +343,22 @@ export default function FilingDetailPage() {
               </div>
             </div>
           </Section>
+        )}
+
+        {/* Email preview modal */}
+        {emailPreviewOpen && myPending && (
+          <EmailPreviewModal
+            filingId={id}
+            approvalId={myPending.approvalId}
+            comment={approvalComment}
+            onClose={() => setEmailPreviewOpen(false)}
+            onSuccess={() => {
+              setEmailPreviewOpen(false);
+              setApprovalComment('');
+              setMyPending(null);
+              loadData();
+            }}
+          />
         )}
       </main>
     </div>

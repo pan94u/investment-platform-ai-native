@@ -37,6 +37,9 @@ export const filings = pgTable('filings', {
   status: varchar('status', { length: 30 }).notNull().default('draft'),
   riskLevel: varchar('risk_level', { length: 10 }),                           // low | medium | high (V3+)
 
+  // 项目编号
+  projectCode: varchar('project_code', { length: 50 }),        // 项目编号
+
   // 关联
   creatorId: text('creator_id').notNull().references(() => users.id),
 
@@ -45,4 +48,5 @@ export const filings = pgTable('filings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   submittedAt: timestamp('submitted_at', { withTimezone: true }),
   completedAt: timestamp('completed_at', { withTimezone: true }),
+  filingTime: timestamp('filing_time', { withTimezone: true }),  // 备案时间=邮件发出时间
 });

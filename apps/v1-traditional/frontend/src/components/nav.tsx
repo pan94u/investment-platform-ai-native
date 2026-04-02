@@ -12,6 +12,8 @@ const NAV_ITEMS = [
   { href: '/approvals', label: '审批待办' },
 ];
 
+const ADMIN_NAV = { href: '/admin', label: '管理' };
+
 export function Nav() {
   const pathname = usePathname();
   const router = useRouter();
@@ -42,7 +44,7 @@ export function Nav() {
             <span className="text-base font-bold text-gray-800 tracking-tight">投资备案</span>
           </Link>
           <nav className="flex items-center gap-1">
-            {NAV_ITEMS.map((item) => {
+            {[...NAV_ITEMS, ...(user?.role === 'admin' ? [ADMIN_NAV] : [])].map((item) => {
               const active =
                 item.href === '/filings'
                   ? pathname === '/filings' || (pathname.startsWith('/filings/') && pathname !== '/filings/new')

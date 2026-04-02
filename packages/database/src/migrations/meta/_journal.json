@@ -8,6 +8,13 @@
       "when": 1773131248736,
       "tag": "0000_panoramic_thanos",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774857600000,
+      "tag": "0001_add_new_fields_and_tables",
+      "breakpoints": true
     }
   ]
 }

@@ -57,6 +57,7 @@ auth.get('/users', async (c) => {
       role: users.role,
       department: users.department,
       domain: users.domain,
+      email: users.email,
     })
     .from(users);
 

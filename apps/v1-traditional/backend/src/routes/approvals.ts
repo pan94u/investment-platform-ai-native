@@ -24,10 +24,17 @@ approvalsRouter.get('/history/:filingId', async (c) => {
 /** POST /api/approvals/:id/approve — 同意 */
 approvalsRouter.post('/:id/approve', async (c) => {
   const user = c.get('user');
-  const body = await c.req.json<{ comment?: string }>().catch(() => ({} as { comment?: string }));
+  const body = await c.req.json<{
+    comment?: string;
+    skipEmail?: boolean;
+    emailOverrides?: { to?: string[]; cc?: string[]; subject?: string };
+  }>().catch(() => ({}) as { comment?: string; skipEmail?: boolean; emailOverrides?: { to?: string[]; cc?: string[]; subject?: string } });
 
   try {
-    const result = await approvalService.processApproval(c.req.param('id'), user.id, 'approve', body.comment, user.name);
+    const emailOptions = (body.skipEmail !== undefined || body.emailOverrides)
+      ? { skipEmail: body.skipEmail, emailOverrides: body.emailOverrides }
+      : undefined;
+    const result = await approvalService.processApproval(c.req.param('id'), user.id, 'approve', body.comment, user.name, emailOptions);
     return c.json({ success: true, data: result, error: null });
   } catch (err) {
     const message = err instanceof Error ? err.message : '审批失败';

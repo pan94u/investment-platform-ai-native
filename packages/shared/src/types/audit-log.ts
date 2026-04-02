@@ -11,6 +11,8 @@ export type AuditAction =
   | 'approval_batch_approved'
   | 'attachment_uploaded'
   | 'attachment_deleted'
+  | 'email_sent'
+  | 'config_updated'
   | 'user_login'
   | 'user_logout';
 

@@ -9,6 +9,7 @@ export interface User {
   readonly role: UserRole;
   readonly department: string;
   readonly domain: string;
+  readonly email?: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }

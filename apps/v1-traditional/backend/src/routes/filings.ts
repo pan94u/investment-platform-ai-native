@@ -4,6 +4,7 @@ import type { AppEnv } from '../lib/types.js';
 import { authMiddleware } from '../middleware/auth.js';
 import * as filingService from '../services/filing.js';
 import * as auditService from '../services/audit.js';
+import * as emailService from '../services/email.js';
 import { getOrgProvider } from '../providers/index.js';
 
 const filingsRouter = new Hono<AppEnv>();
@@ -120,6 +121,20 @@ filingsRouter.post('/:id/recall', async (c) => {
     return c.json({ success: true, data: filing, error: null });
   } catch (err) {
     const message = err instanceof Error ? err.message : '撤回失败';
+    return c.json({ success: false, data: null, error: message }, 400);
+  }
+});
+
+/** GET /api/filings/:id/email-preview — 预览完结邮件（收件人+正文） */
+filingsRouter.get('/:id/email-preview', async (c) => {
+  try {
+    const preview = await emailService.getEmailPreview(c.req.param('id'));
+    if (!preview) {
+      return c.json({ success: false, data: null, error: '备案不存在' }, 404);
+    }
+    return c.json({ success: true, data: preview, error: null });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '获取邮件预览失败';
     return c.json({ success: false, data: null, error: message }, 400);
   }
 });

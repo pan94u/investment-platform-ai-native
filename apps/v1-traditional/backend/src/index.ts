@@ -5,6 +5,9 @@ import { logger } from 'hono/logger';
 import { auth } from './routes/auth.js';
 import { filingsRouter } from './routes/filings.js';
 import { approvalsRouter } from './routes/approvals.js';
+import { attachmentsRouter } from './routes/attachments.js';
+import { adminRouter } from './routes/admin.js';
+import { strategicRouter } from './routes/strategic.js';
 import { mockRouter } from './routes/mock.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { webhooksRouter } from './routes/webhooks.js';
@@ -30,6 +33,9 @@ app.get('/health', (c) => {
 app.route('/api/auth', auth);
 app.route('/api/filings', filingsRouter);
 app.route('/api/approvals', approvalsRouter);
+app.route('/api', attachmentsRouter);          // /api/filings/:id/attachments + /api/attachments/:id/*
+app.route('/api/admin', adminRouter);
+app.route('/api/strategic', strategicRouter);
 app.route('/api/mock', mockRouter);
 app.route('/api/dashboard', dashboardRouter);
 app.route('/api/webhooks', webhooksRouter);

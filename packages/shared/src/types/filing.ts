@@ -76,6 +76,9 @@ export interface Filing {
   readonly status: FilingStatus;
   readonly riskLevel: RiskLevel | null;       // V3+ 风险评估
 
+  // 项目编号
+  readonly projectCode: string | null;
+
   // 关联
   readonly creatorId: string;
   readonly creator?: User;
@@ -85,6 +88,7 @@ export interface Filing {
   readonly updatedAt: Date;
   readonly submittedAt: Date | null;
   readonly completedAt: Date | null;
+  readonly filingTime: Date | null;              // 备案时间=邮件发出时间
 }
 
 /** 创建备案请求 */
@@ -106,6 +110,7 @@ export interface CreateFilingRequest {
   readonly changeReason?: string;
   readonly approvalGroups?: readonly ApprovalGroupName[];
   readonly emailRecipients?: readonly string[];
+  readonly projectCode?: string;
 }
 
 /** 更新备案请求 */

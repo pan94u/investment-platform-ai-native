@@ -9,6 +9,7 @@ export const seedUsers = [
     role: 'initiator',
     department: '智慧住居事业部',
     domain: 'smart_living',
+    email: 'zhangsan@haier.com',
   },
   {
     id: 'user-lisi',
@@ -18,6 +19,7 @@ export const seedUsers = [
     role: 'supervisor',
     department: '智慧住居事业部',
     domain: 'smart_living',
+    email: 'lisi@haier.com',
   },
   {
     id: 'user-wangwu',
@@ -27,6 +29,7 @@ export const seedUsers = [
     role: 'group_approver',
     department: '集团战略投资部',
     domain: 'smart_living',
+    email: 'wangwu@haier.com',
   },
   {
     id: 'user-admin',
@@ -36,6 +39,7 @@ export const seedUsers = [
     role: 'admin',
     department: '集团战略投资部',
     domain: 'smart_living',
+    email: 'caozhi@haier.com',
   },
   {
     id: 'user-ceo',
@@ -45,6 +49,7 @@ export const seedUsers = [
     role: 'viewer',
     department: '集团管理层',
     domain: 'smart_living',
+    email: 'chenzong@haier.com',
   },
 ];
 
@@ -73,8 +78,10 @@ export const seedFilings = [
     status: 'completed',
     riskLevel: null,
     creatorId: 'user-zhangsan',
+    projectCode: '2025-03-01-001',
     submittedAt: new Date('2025-03-01T10:00:00Z'),
     completedAt: new Date('2025-03-05T16:00:00Z'),
+    filingTime: new Date('2025-03-05T16:00:00Z'),
   },
   {
     id: 'filing-002',
@@ -100,8 +107,10 @@ export const seedFilings = [
     status: 'completed',
     riskLevel: null,
     creatorId: 'user-zhangsan',
+    projectCode: '2025-11-01-001',
     submittedAt: new Date('2025-11-01T09:00:00Z'),
     completedAt: new Date('2025-11-08T14:00:00Z'),
+    filingTime: new Date('2025-11-08T14:00:00Z'),
   },
   {
     id: 'filing-003',
@@ -127,8 +136,10 @@ export const seedFilings = [
     status: 'completed',
     riskLevel: null,
     creatorId: 'user-zhangsan',
+    projectCode: '2026-02-01-001',
     submittedAt: new Date('2026-02-01T08:30:00Z'),
     completedAt: new Date('2026-02-10T11:00:00Z'),
+    filingTime: new Date('2026-02-10T11:00:00Z'),
   },
   {
     id: 'filing-004',
@@ -154,8 +165,10 @@ export const seedFilings = [
     status: 'completed',
     riskLevel: null,
     creatorId: 'user-zhangsan',
+    projectCode: '2026-02-05-001',
     submittedAt: new Date('2026-02-05T14:00:00Z'),
     completedAt: new Date('2026-02-12T09:00:00Z'),
+    filingTime: new Date('2026-02-12T09:00:00Z'),
   },
   {
     id: 'filing-005',
@@ -181,8 +194,10 @@ export const seedFilings = [
     status: 'pending_business',
     riskLevel: null,
     creatorId: 'user-zhangsan',
+    projectCode: '2026-03-01-001',
     submittedAt: new Date('2026-03-01T10:00:00Z'),
     completedAt: null,
+    filingTime: null,
   },
 ];
 
@@ -249,4 +264,30 @@ export const seedApprovals = [
     comment: null,
     decidedAt: null,
   },
+];
+
+/** 审批节点配置初始数据 */
+export const seedApprovalConfigs = [
+  { id: 'ac-finance-1', groupName: 'finance', userId: 'user-wangwu', userName: '张蕾', userEmail: 'zhanglei.gxcw@haier.com' },
+  { id: 'ac-hr-1', groupName: 'hr', userId: 'user-wangwu', userName: '杨阳', userEmail: 'yangy.hr@haier.com' },
+  { id: 'ac-strategy-1', groupName: 'strategy', userId: 'user-admin', userName: '曹智', userEmail: 'caozhi@haier.com' },
+  { id: 'ac-legal-1', groupName: 'legal', userId: 'user-wangwu', userName: '王杰斯', userEmail: 'wangjiesi@haier.com' },
+  { id: 'ac-audit-1', groupName: 'audit', userId: 'user-wangwu', userName: '肖磊', userEmail: 'xiaolei@haier.com' },
+  { id: 'ac-confirmation-1', groupName: 'confirmation', userId: 'user-admin', userName: '曹智', userEmail: 'caozhi@haier.com' },
+];
+
+/** 固定邮件抄送名单初始数据 */
+export const seedEmailCcConfigs = [
+  { id: 'ecc-finance-1', groupName: 'finance', name: '宫伟', email: 'gongw@haier.com' },
+  { id: 'ecc-finance-2', groupName: 'finance', name: '张蕾', email: 'zhanglei.gxcw@haier.com' },
+  { id: 'ecc-hr-1', groupName: 'hr', name: '纪婷琪', email: 'jitq@haier.com' },
+  { id: 'ecc-hr-2', groupName: 'hr', name: '杨阳', email: 'yangy.hr@haier.com' },
+  { id: 'ecc-strategy-1', groupName: 'strategy', name: '黄雯瑶', email: 'huangweny@haier.com' },
+  { id: 'ecc-strategy-2', groupName: 'strategy', name: '徐妙晨', email: 'xumch@haier.com' },
+  { id: 'ecc-strategy-3', groupName: 'strategy', name: '曹智', email: 'caozhi@haier.com' },
+  { id: 'ecc-strategy-4', groupName: 'strategy', name: '赵远亮', email: 'zhaoyuanliang@haier.com' },
+  { id: 'ecc-legal-1', groupName: 'legal', name: '张翠美', email: 'zhangcm@haier.com' },
+  { id: 'ecc-legal-2', groupName: 'legal', name: '王杰斯', email: 'wangjiesi@haier.com' },
+  { id: 'ecc-audit-1', groupName: 'audit', name: '李少华', email: 'lishaohua@haier.com' },
+  { id: 'ecc-audit-2', groupName: 'audit', name: '肖磊', email: 'xiaolei@haier.com' },
 ];

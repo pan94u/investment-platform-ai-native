@@ -71,3 +71,17 @@ export interface NotifyProvider {
   updateTodo(externalTodoId: string, update: Record<string, string>): Promise<void>;
   closeTodo(externalTodoId: string, result: 'approved' | 'rejected' | 'recalled' | 'acknowledged'): Promise<void>;
 }
+
+/** 邮件载荷 */
+export interface EmailPayload {
+  readonly to: string[];       // 邮箱地址
+  readonly cc: string[];
+  readonly subject: string;
+  readonly htmlBody: string;
+  readonly attachments: readonly { filename: string; path: string; mimeType: string }[];
+}
+
+/** 邮件提供者 */
+export interface EmailProvider {
+  sendEmail(payload: EmailPayload): Promise<boolean>;
+}

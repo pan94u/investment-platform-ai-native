@@ -5,6 +5,12 @@ import { db } from '../lib/db.js';
 import { generateId } from '../lib/id.js';
 import { getOrgProvider, getNotifyProvider } from '../providers/index.js';
 import * as auditService from './audit.js';
+import { sendCompletionEmail, sendCompletionEmailWithOverrides } from './email.js';
+
+export interface EmailOptions {
+  skipEmail?: boolean;
+  emailOverrides?: { to?: string[]; cc?: string[]; subject?: string };
+}
 
 // ─── 查询 ────────────────────────────────────────────
 
@@ -74,6 +80,7 @@ export async function processApproval(
   action: ApprovalAction,
   comment?: string,
   approverName?: string,
+  emailOptions?: EmailOptions,
 ) {
   // 验证审批记录
   const existing = await db.select().from(approvals).where(eq(approvals.id, approvalId)).limit(1);
@@ -111,9 +118,27 @@ export async function processApproval(
   const filingRows = await db.select().from(filings).where(eq(filings.id, approval.filingId)).limit(1);
   const filing = filingRows[0];
 
-  // 驳回: 任何阶段驳回 → filing rejected
+  // 驳回: 任何阶段驳回 → filing 回到草稿（发起人可修改后重新提交），审批记录保留
   if (action === 'reject') {
-    await db.update(filings).set({ status: 'rejected', updatedAt: now }).where(eq(filings.id, filing.id));
+    // 关闭同一 filing 的其他 pending 审批（如集团阶段并行审批）
+    const otherPending = await db
+      .select()
+      .from(approvals)
+      .where(and(eq(approvals.filingId, filing.id), eq(approvals.status, 'pending')));
+
+    for (const other of otherPending) {
+      await db.update(approvals).set({
+        status: 'rejected',
+        comment: '关联审批驳回，自动关闭',
+        decidedAt: now,
+      }).where(eq(approvals.id, other.id));
+
+      if (other.externalTodoId) {
+        await notifyProvider.closeTodo(other.externalTodoId, 'rejected');
+      }
+    }
+
+    await db.update(filings).set({ status: 'draft', submittedAt: null, updatedAt: now }).where(eq(filings.id, filing.id));
 
     await auditService.logAudit({
       action: 'filing_rejected',
@@ -124,7 +149,7 @@ export async function processApproval(
       detail: { comment, stage: approval.stage, level: approval.level, groupName: approval.groupName },
     });
 
-    return { status: 'rejected' as const, filingStatus: 'rejected' as const };
+    return { status: 'rejected' as const, filingStatus: 'draft' as const };
   }
 
   // 同意或知悉 → 根据阶段决定下一步
@@ -143,7 +168,7 @@ export async function processApproval(
     case 'group':
       return handleGroupApproved(filing, now);
     case 'confirmation':
-      return handleConfirmationApproved(filing, approverId, now);
+      return handleConfirmationApproved(filing, approverId, now, emailOptions);
     default:
       throw new Error(`未知审批阶段: ${approval.stage}`);
   }
@@ -372,6 +397,7 @@ async function handleConfirmationApproved(
   filing: typeof filings.$inferSelect,
   confirmerId: string,
   now: Date,
+  emailOptions?: EmailOptions,
 ) {
   await db.update(filings).set({
     status: 'completed',
@@ -379,6 +405,19 @@ async function handleConfirmationApproved(
     completedAt: now,
     updatedAt: now,
   }).where(eq(filings.id, filing.id));
+
+  // 发送完结邮件通知（失败不影响备案完成）
+  if (!emailOptions?.skipEmail) {
+    try {
+      if (emailOptions?.emailOverrides) {
+        await sendCompletionEmailWithOverrides(filing.id, emailOptions.emailOverrides);
+      } else {
+        await sendCompletionEmail(filing.id);
+      }
+    } catch (err) {
+      console.error(`[Approval] 发送完结邮件失败:`, err);
+    }
+  }
 
   return { status: 'approved' as const, filingStatus: 'completed' as const };
 }

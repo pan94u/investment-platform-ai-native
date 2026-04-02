@@ -1,21 +1,21 @@
-import { eq, and, inArray } from 'drizzle-orm';
-import { users } from '@filing/database';
+import { eq, and } from 'drizzle-orm';
+import { users, approvalConfigs } from '@filing/database';
 import type { ApprovalGroupName } from '@filing/shared';
 import { db } from '../lib/db.js';
 import type { OrgProvider, ApproverChainContext, ApproverInfo, GroupApproverInfo, ConfirmationInfo } from './types.js';
 
 /**
- * 从本地 users 表查审批链
+ * 从本地 users 表 + approval_group_configs 表查审批链
  *
  * 业务侧审批链逻辑:
  *   发起人 → 直线上级(supervisor) → 平台主(admin)
  *   同人捏合: 如果相邻两级是同一人，合并为一级
  *
  * 集团审批组:
- *   按 groupName 查对应 group_approver 角色用户
+ *   优先查 approval_group_configs 表（isActive=true），降级到 users 表
  *
  * 最终确认:
- *   固定为 strategy 组的默认审批人（曹智）
+ *   优先查 approval_group_configs where groupName='confirmation'，降级到 admin 用户
  */
 export class DatabaseOrgProvider implements OrgProvider {
   /**
@@ -70,28 +70,47 @@ export class DatabaseOrgProvider implements OrgProvider {
 
   /**
    * 获取集团审批组审批人
-   * PoC: 按 role=group_approver 查用户，department 匹配 groupName
-   * 生产: 由管理员在 approval_group_configs 表配置
+   * 优先查 approval_group_configs 表（isActive=true），降级到 users 表
    */
   async getGroupApprovers(groupNames: readonly ApprovalGroupName[]): Promise<readonly GroupApproverInfo[]> {
     if (groupNames.length === 0) return [];
 
-    // PoC: 从 users 表中查找 group_approver 角色，按 department 映射 groupName
-    const groupApproverUsers = await db
-      .select({ id: users.id, name: users.name, department: users.department })
-      .from(users)
-      .where(eq(users.role, 'group_approver'));
-
-    // 为每个请求的 groupName 分配审批人
     const result: GroupApproverInfo[] = [];
+
+    // 先查配置表
+    const configRows = await db
+      .select()
+      .from(approvalConfigs)
+      .where(eq(approvalConfigs.isActive, true));
+
+    const configByGroup: Record<string, typeof configRows[0]> = {};
+    for (const row of configRows) {
+      if (!configByGroup[row.groupName]) {
+        configByGroup[row.groupName] = row;
+      }
+    }
+
+    // 降级用：查 users 表中的 group_approver
+    let fallbackUsers: Array<{ id: string; name: string; department: string }> | null = null;
+
     for (const groupName of groupNames) {
-      // 尝试按 department 匹配
-      const matched = groupApproverUsers.find(u => u.department.toLowerCase().includes(groupName));
-      if (matched) {
-        result.push({ userId: matched.id, name: matched.name, groupName });
-      } else if (groupApproverUsers.length > 0) {
-        // fallback: 使用第一个 group_approver
-        result.push({ userId: groupApproverUsers[0].id, name: groupApproverUsers[0].name, groupName });
+      const config = configByGroup[groupName];
+      if (config) {
+        result.push({ userId: config.userId, name: config.userName, groupName });
+      } else {
+        // 降级到 users 表
+        if (!fallbackUsers) {
+          fallbackUsers = await db
+            .select({ id: users.id, name: users.name, department: users.department })
+            .from(users)
+            .where(eq(users.role, 'group_approver'));
+        }
+        const matched = fallbackUsers.find(u => u.department.toLowerCase().includes(groupName));
+        if (matched) {
+          result.push({ userId: matched.id, name: matched.name, groupName });
+        } else if (fallbackUsers.length > 0) {
+          result.push({ userId: fallbackUsers[0].id, name: fallbackUsers[0].name, groupName });
+        }
       }
     }
 
@@ -100,10 +119,21 @@ export class DatabaseOrgProvider implements OrgProvider {
 
   /**
    * 获取最终确认人
-   * PoC: 查 admin 角色用户中的第一个（代表曹智）
-   * 生产: 配置化
+   * 优先查 approval_group_configs where groupName='confirmation'
+   * 降级到 admin 用户
    */
   async getConfirmationApprover(): Promise<ConfirmationInfo> {
+    // 先查配置表
+    const configRows = await db
+      .select()
+      .from(approvalConfigs)
+      .where(and(eq(approvalConfigs.groupName, 'confirmation'), eq(approvalConfigs.isActive, true)));
+
+    if (configRows.length > 0) {
+      return { userId: configRows[0].userId, name: configRows[0].userName };
+    }
+
+    // 降级到 admin
     const admins = await db
       .select({ id: users.id, name: users.name })
       .from(users)

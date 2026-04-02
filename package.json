@@ -16,5 +16,10 @@
   "devDependencies": {
     "turbo": "^2.4.0",
     "typescript": "^5.7.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@haier/aio": "npm:noop-package@1.0.0"
+    }
   }
 }
