@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { iamService } from '@/lib/iam-service'
-import { api, getCurrentUser, setCurrentUser } from '@/lib/api'
+import { api, setCurrentUser } from '@/lib/api'
 
 export function IAMProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false)
@@ -14,14 +14,18 @@ export function IAMProvider({ children }: { children: ReactNode }) {
         // 1. 初始化 IAM SDK
         await iamService.initialize()
 
-        // 2. 检查是否已登录（本地有 token）
-        const isAuthenticated = await iamService.isAuthenticated()
-        if (!isAuthenticated) {
+        // 2. 通过 SDK 获取用户信息（同时校验 token 有效性及过期）
+        //    返回 null/undefined 代表未登录或 token 已过期，需重新登录
+        let iamUser = await iamService.getCurrentUser()
+
+        if (!iamUser) {
           const loginResult = await iamService.login()
           if (!loginResult.success) {
             setError(`登录失败: ${loginResult.error}`)
             return
           }
+          // 登录后再次从 SDK 取用户信息
+          iamUser = await iamService.getCurrentUser()
         }
 
         // 3. 清除 URL 上的 OAuth 回调参数
@@ -33,14 +37,7 @@ export function IAMProvider({ children }: { children: ReactNode }) {
           window.history.replaceState({}, '', url.pathname + url.search)
         }
 
-        // 4. 如果 currentUser 已存在（本次会话已初始化过），直接进入
-        if (getCurrentUser()) {
-          setReady(true)
-          return
-        }
-
-        // 5. 从 IAM 获取用户信息，提取工号（emp_code）
-        const iamUser = await iamService.getCurrentUser()
+        // 4. 提取工号
         const empCode = (
           iamUser?.empCode ??
           iamUser?.account ??
@@ -49,11 +46,11 @@ export function IAMProvider({ children }: { children: ReactNode }) {
         ) as string | undefined
 
         if (empCode) {
-          // 存入 localStorage，让 requestWithAuth 能带上 X-User-Id
+          // 供 requestWithAuth 带 X-User-Id header（开发环境无网关时使用）
           localStorage.setItem('userId', empCode)
         }
 
-        // 6. 调用后端 /api/auth/me 获取完整档案（org 表 + user_roles 表）
+        // 5. 调用后端 /api/auth/me 获取完整档案（org 表 + user_roles 表）
         try {
           const profile = await api.getAuthMe()
           setCurrentUser({
@@ -65,7 +62,7 @@ export function IAMProvider({ children }: { children: ReactNode }) {
             domain: profile.domain,
           })
         } catch {
-          // org 表不可达时降级：用 IAM 返回的基本信息
+          // org 表不可达时降级：用 SDK 返回的基本信息
           if (empCode) {
             setCurrentUser({
               id: empCode,
