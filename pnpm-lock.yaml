@@ -31,10 +31,13 @@ importers:
         version: 1.19.11(hono@4.12.6)
       drizzle-orm:
         specifier: ^0.38.0
-        version: 0.38.4(@types/react@19.2.14)(postgres@3.4.8)(react@19.2.4)
+        version: 0.38.4(@types/react@19.2.14)(mysql2@3.20.0(@types/node@22.19.15))(postgres@3.4.8)(react@19.2.4)
       hono:
         specifier: ^4.7.0
         version: 4.12.6
+      mysql2:
+        specifier: ^3.11.0
+        version: 3.20.0(@types/node@22.19.15)
       nanoid:
         specifier: ^5.1.0
         version: 5.1.6
@@ -128,231 +131,6 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  apps/v2-ai-native/backend:
-    dependencies:
-      '@filing/database':
-        specifier: workspace:*
-        version: link:../../../packages/database
-      '@filing/shared':
-        specifier: workspace:*
-        version: link:../../../packages/shared
-      '@hono/node-server':
-        specifier: ^1.14.0
-        version: 1.19.11(hono@4.12.6)
-      drizzle-orm:
-        specifier: ^0.38.0
-        version: 0.38.4(@types/react@19.2.14)(postgres@3.4.8)(react@19.2.4)
-      hono:
-        specifier: ^4.7.0
-        version: 4.12.6
-      nanoid:
-        specifier: ^5.1.0
-        version: 5.1.6
-      postgres:
-        specifier: ^3.4.0
-        version: 3.4.8
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.15
-      tsx:
-        specifier: ^4.19.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-
-  apps/v2-ai-native/frontend:
-    dependencies:
-      '@filing/shared':
-        specifier: workspace:*
-        version: link:../../../packages/shared
-      clsx:
-        specifier: ^2.1.0
-        version: 2.1.1
-      lucide-react:
-        specifier: ^0.475.0
-        version: 0.475.0(react@19.2.4)
-      next:
-        specifier: ^15.3.0
-        version: 15.5.12(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      react:
-        specifier: ^19.0.0
-        version: 19.2.4
-      react-dom:
-        specifier: ^19.0.0
-        version: 19.2.4(react@19.2.4)
-    devDependencies:
-      '@tailwindcss/postcss':
-        specifier: ^4.0.0
-        version: 4.2.1
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.15
-      '@types/react':
-        specifier: ^19.0.0
-        version: 19.2.14
-      '@types/react-dom':
-        specifier: ^19.0.0
-        version: 19.2.3(@types/react@19.2.14)
-      tailwindcss:
-        specifier: ^4.0.0
-        version: 4.2.1
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-
-  apps/v3-insights/backend:
-    dependencies:
-      '@filing/database':
-        specifier: workspace:*
-        version: link:../../../packages/database
-      '@filing/shared':
-        specifier: workspace:*
-        version: link:../../../packages/shared
-      '@hono/node-server':
-        specifier: ^1.14.0
-        version: 1.19.11(hono@4.12.6)
-      drizzle-orm:
-        specifier: ^0.38.0
-        version: 0.38.4(@types/react@19.2.14)(postgres@3.4.8)(react@19.2.4)
-      hono:
-        specifier: ^4.7.0
-        version: 4.12.6
-      nanoid:
-        specifier: ^5.1.0
-        version: 5.1.6
-      postgres:
-        specifier: ^3.4.0
-        version: 3.4.8
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.15
-      tsx:
-        specifier: ^4.19.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-
-  apps/v3-insights/frontend:
-    dependencies:
-      '@filing/shared':
-        specifier: workspace:*
-        version: link:../../../packages/shared
-      clsx:
-        specifier: ^2.1.0
-        version: 2.1.1
-      lucide-react:
-        specifier: ^0.475.0
-        version: 0.475.0(react@19.2.4)
-      next:
-        specifier: ^15.3.0
-        version: 15.5.12(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      react:
-        specifier: ^19.0.0
-        version: 19.2.4
-      react-dom:
-        specifier: ^19.0.0
-        version: 19.2.4(react@19.2.4)
-    devDependencies:
-      '@tailwindcss/postcss':
-        specifier: ^4.0.0
-        version: 4.2.1
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.15
-      '@types/react':
-        specifier: ^19.0.0
-        version: 19.2.14
-      '@types/react-dom':
-        specifier: ^19.0.0
-        version: 19.2.3(@types/react@19.2.14)
-      tailwindcss:
-        specifier: ^4.0.0
-        version: 4.2.1
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-
-  apps/v4-synapse/frontend:
-    dependencies:
-      '@anthropic-ai/sdk':
-        specifier: ^0.52.0
-        version: 0.52.0
-      clsx:
-        specifier: ^2.1.0
-        version: 2.1.1
-      lucide-react:
-        specifier: ^0.475.0
-        version: 0.475.0(react@19.2.4)
-      next:
-        specifier: ^15.3.0
-        version: 15.5.12(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      react:
-        specifier: ^19.0.0
-        version: 19.2.4
-      react-dom:
-        specifier: ^19.0.0
-        version: 19.2.4(react@19.2.4)
-    devDependencies:
-      '@tailwindcss/postcss':
-        specifier: ^4.0.0
-        version: 4.2.1
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.15
-      '@types/react':
-        specifier: ^19.0.0
-        version: 19.2.14
-      '@types/react-dom':
-        specifier: ^19.0.0
-        version: 19.2.3(@types/react@19.2.14)
-      postcss:
-        specifier: ^8.5.0
-        version: 8.5.8
-      tailwindcss:
-        specifier: ^4.0.0
-        version: 4.2.1
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-
-  apps/v4-synapse/mcp-server:
-    dependencies:
-      '@filing/database':
-        specifier: workspace:*
-        version: link:../../../packages/database
-      '@filing/shared':
-        specifier: workspace:*
-        version: link:../../../packages/shared
-      '@hono/node-server':
-        specifier: ^1.14.0
-        version: 1.19.11(hono@4.12.6)
-      drizzle-orm:
-        specifier: ^0.38.0
-        version: 0.38.4(@types/react@19.2.14)(postgres@3.4.8)(react@19.2.4)
-      hono:
-        specifier: ^4.7.0
-        version: 4.12.6
-      nanoid:
-        specifier: ^5.1.0
-        version: 5.1.6
-      postgres:
-        specifier: ^3.4.0
-        version: 3.4.8
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.15
-      tsx:
-        specifier: ^4.19.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-
   packages/database:
     dependencies:
       '@filing/shared':
@@ -360,7 +138,7 @@ importers:
         version: link:../shared
       drizzle-orm:
         specifier: ^0.38.0
-        version: 0.38.4(@types/react@19.2.14)(postgres@3.4.8)(react@19.2.4)
+        version: 0.38.4(@types/react@19.2.14)(mysql2@3.20.0(@types/node@25.4.0))(postgres@3.4.8)(react@19.2.4)
       postgres:
         specifier: ^3.4.0
         version: 3.4.8
@@ -398,10 +176,6 @@ packages:
   '@alloc/quick-lru@5.2.0':
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==, tarball: http://nexus.haier.net/repository/dts-npm-group/@alloc/quick-lru/-/quick-lru-5.2.0.tgz}
     engines: {node: '>=10'}
-
-  '@anthropic-ai/sdk@0.52.0':
-    resolution: {integrity: sha512-d4c+fg+xy9e46c8+YnrrgIQR45CZlAi7PwdzIfDXDM6ACxEZli1/fxhURsq30ZpMZy6LvSkr41jGq5aF5TD7rQ==, tarball: http://nexus.haier.net/repository/dts-npm-group/@anthropic-ai/sdk/-/sdk-0.52.0.tgz}
-    hasBin: true
 
   '@drizzle-team/brocli@0.10.2':
     resolution: {integrity: sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w==, tarball: http://nexus.haier.net/repository/dts-npm-group/@drizzle-team/brocli/-/brocli-0.10.2.tgz}
@@ -844,39 +618,39 @@ packages:
     os: [win32]
 
   '@haier/abstract-pipeline@0.1.22':
-    resolution: {integrity: sha512-hUN4Dr5APbytrVXjM524n0LijpVDk/MaxcUpdW8mzwCScCOUFXbTqzya51FxYC6Z+LpEv+xkwFElDyq4eere8Q==, tarball: http://nexus.haier.net/repository/dts-npm-group/@haier/abstract-pipeline/-/abstract-pipeline-0.1.22.tgz}
+    resolution: {integrity: sha512-hUN4Dr5APbytrVXjM524n0LijpVDk/MaxcUpdW8mzwCScCOUFXbTqzya51FxYC6Z+LpEv+xkwFElDyq4eere8Q==}
 
   '@haier/constants@0.2.8':
-    resolution: {integrity: sha512-+LoWiWgBTCg9i+h15Y32P/L+TxvUP6lgfXq/jOnjHtXXixSqVdBKwnM+5VtVNYLWe3s1vonq+uPim6i2cdf90w==, tarball: http://nexus.haier.net/repository/dts-npm-group/@haier/constants/-/constants-0.2.8.tgz}
+    resolution: {integrity: sha512-+LoWiWgBTCg9i+h15Y32P/L+TxvUP6lgfXq/jOnjHtXXixSqVdBKwnM+5VtVNYLWe3s1vonq+uPim6i2cdf90w==}
 
   '@haier/i18n@0.1.9':
-    resolution: {integrity: sha512-xG4m/nLT6hXXHeexkc2gN/P5Vei/C+7PSVWmbIy8FrLi+AVVg5kLdAaOgqvodToEBrVHGYRW/rM5Wa3K3VtlZQ==, tarball: http://nexus.haier.net/repository/dts-npm-group/@haier/i18n/-/i18n-0.1.9.tgz}
+    resolution: {integrity: sha512-xG4m/nLT6hXXHeexkc2gN/P5Vei/C+7PSVWmbIy8FrLi+AVVg5kLdAaOgqvodToEBrVHGYRW/rM5Wa3K3VtlZQ==}
 
   '@haier/iam-packi-config@0.1.0':
-    resolution: {integrity: sha512-Luz0D3nLcjcQJ8rPV/4fJdD8WKHKD+AP5SRl/HErCt3SA1GLsBkcsyb/Hwg2dZJ+vsIKGONde1zDmKomHGgpkQ==, tarball: http://nexus.haier.net/repository/dts-npm-group/@haier/iam-packi-config/-/iam-packi-config-0.1.0.tgz}
+    resolution: {integrity: sha512-Luz0D3nLcjcQJ8rPV/4fJdD8WKHKD+AP5SRl/HErCt3SA1GLsBkcsyb/Hwg2dZJ+vsIKGONde1zDmKomHGgpkQ==}
 
   '@haier/iam-signature@0.1.1':
-    resolution: {integrity: sha512-OUxgt0xzzQ8FBv4poMF9XjfHTXUomlzrV4mwdPaSKFo04zP/HWWSjKG7Qyfgl9sDOdlgE4Rx8IA76b3/Y9GUuw==, tarball: http://nexus.haier.net/repository/dts-npm-group/@haier/iam-signature/-/iam-signature-0.1.1.tgz}
+    resolution: {integrity: sha512-OUxgt0xzzQ8FBv4poMF9XjfHTXUomlzrV4mwdPaSKFo04zP/HWWSjKG7Qyfgl9sDOdlgE4Rx8IA76b3/Y9GUuw==}
     peerDependencies:
       tslib: '>=2.0.0'
 
   '@haier/iam@1.9.4':
-    resolution: {integrity: sha512-Q2Dvaj7pJ37CEMRINUv0UY89Ie0YK8bpzh7KHQAvT3vGrSzSbBmfDi0KowMmAwUX0JfaaXI2hIk4d8Nx572rnQ==, tarball: http://nexus.haier.net/repository/dts-npm-group/@haier/iam/-/iam-1.9.4.tgz}
+    resolution: {integrity: sha512-Q2Dvaj7pJ37CEMRINUv0UY89Ie0YK8bpzh7KHQAvT3vGrSzSbBmfDi0KowMmAwUX0JfaaXI2hIk4d8Nx572rnQ==}
     peerDependencies:
       '@haier/aio': npm:noop-package@1.0.0
       react: ^17.0.2
 
   '@haier/named-task@0.1.4':
-    resolution: {integrity: sha512-yrWvz6t03i3jxnOA31hb2L0H4ZYdmsqrZDSYt1uIrBeU7VELGW4FkIexiEu7TXmveOkPA8+Y7rMh5ILq4FEHHw==, tarball: http://nexus.haier.net/repository/dts-npm-group/@haier/named-task/-/named-task-0.1.4.tgz}
+    resolution: {integrity: sha512-yrWvz6t03i3jxnOA31hb2L0H4ZYdmsqrZDSYt1uIrBeU7VELGW4FkIexiEu7TXmveOkPA8+Y7rMh5ILq4FEHHw==}
 
   '@haier/p-pipe@0.1.3':
-    resolution: {integrity: sha512-ah20U6f+5mqPNa1PjPnrnFblM4EXaBSQ/4B4s1f9IpySKLNc89kyVIUuNv5Vl5HsWLJQGgTbS3uRUkAwo8aU0g==, tarball: http://nexus.haier.net/repository/dts-npm-group/@haier/p-pipe/-/p-pipe-0.1.3.tgz}
+    resolution: {integrity: sha512-ah20U6f+5mqPNa1PjPnrnFblM4EXaBSQ/4B4s1f9IpySKLNc89kyVIUuNv5Vl5HsWLJQGgTbS3uRUkAwo8aU0g==}
 
   '@haier/turbu-react@0.2.6':
-    resolution: {integrity: sha512-lC7EjDznIcXWfPaaZ/ZUmvKlFSXY1LFpEf4FTrKdGetLnjDrXaDls40eYjj/Q2O/ZuP3xWx0CY35S8bcXPlk/Q==, tarball: http://nexus.haier.net/repository/dts-npm-group/@haier/turbu-react/-/turbu-react-0.2.6.tgz}
+    resolution: {integrity: sha512-lC7EjDznIcXWfPaaZ/ZUmvKlFSXY1LFpEf4FTrKdGetLnjDrXaDls40eYjj/Q2O/ZuP3xWx0CY35S8bcXPlk/Q==}
 
   '@haier/turbu@0.2.37':
-    resolution: {integrity: sha512-8d+pMaKjuJyKEKe4wZ8ANLk3kiJi2lsV6WIzNZlSsNn6rRMckHY66iMsA1U5J6Ps41p679B2p96aT+Nvaohq4Q==, tarball: http://nexus.haier.net/repository/dts-npm-group/@haier/turbu/-/turbu-0.2.37.tgz}
+    resolution: {integrity: sha512-8d+pMaKjuJyKEKe4wZ8ANLk3kiJi2lsV6WIzNZlSsNn6rRMckHY66iMsA1U5J6Ps41p679B2p96aT+Nvaohq4Q==}
 
   '@hono/node-server@1.19.11':
     resolution: {integrity: sha512-dr8/3zEaB+p0D2n/IUrlPF1HZm586qgJNXK1a9fhg/PzdtkK7Ksd5l312tJX2yBuALqDYBlG20QEbayqPyxn+g==, tarball: http://nexus.haier.net/repository/dts-npm-group/@hono/node-server/-/node-server-1.19.11.tgz}
@@ -1401,6 +1175,10 @@ packages:
   argparse@2.0.1:
     resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
 
+  aws-ssl-profiles@1.1.2:
+    resolution: {integrity: sha512-NZKeq9AfyQvEeNlN0zSYAaWrmBffJh3IELMZfRpJVWgrpEbtEpnjvzqBPf+mxoI287JohRDoa+/nsfqqiZmF6g==}
+    engines: {node: '>= 6.0.0'}
+
   buffer-from@1.1.2:
     resolution: {integrity: sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==, tarball: http://nexus.haier.net/repository/dts-npm-group/buffer-from/-/buffer-from-1.1.2.tgz}
 
@@ -1462,6 +1240,10 @@ packages:
   define-properties@1.2.1:
     resolution: {integrity: sha512-8QmQKqEASLd5nx0U1B1okLElbUuuttJ/AnYmRXbbbGDWh6uS208EjD4Xqq/I9wK7u0v6O08XhTWnt5XtEbR6Dg==, tarball: http://nexus.haier.net/repository/dts-npm-group/define-properties/-/define-properties-1.2.1.tgz}
     engines: {node: '>= 0.4'}
+
+  denque@2.1.0:
+    resolution: {integrity: sha512-HVQE3AAb/pxF8fQAoiqpvg9i3evqug3hoiwakOyZAwJm+6vZehbkYXZ0l4JxS+I3QxM97v5aaRNhj8v5oBhekw==}
+    engines: {node: '>=0.10'}
 
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==, tarball: http://nexus.haier.net/repository/dts-npm-group/detect-libc/-/detect-libc-2.1.2.tgz}
@@ -1635,6 +1417,9 @@ packages:
     engines: {node: '>= 18.0.0'}
     hasBin: true
 
+  generate-function@2.3.1:
+    resolution: {integrity: sha512-eeB5GfMNeevm/GRYq20ShmsaGcmI81kIX2K9XQx5miC8KdHaC6Jm0qQ8ZNeGOi7wYB8OsdxKs+Y2oVuTFuVwKQ==}
+
   get-intrinsic@1.3.0:
     resolution: {integrity: sha512-9fSjSaos/fRIVIp+xSJlE6lfwhES7LNtKaCBIamHsjr2na1BiABJPo0mOjjz8GJDURarmCPGqaiVg5mfjb98CQ==, tarball: http://nexus.haier.net/repository/dts-npm-group/get-intrinsic/-/get-intrinsic-1.3.0.tgz}
     engines: {node: '>= 0.4'}
@@ -1672,8 +1457,15 @@ packages:
     resolution: {integrity: sha512-KljEp+MeEEEIOT75qBo1UjqqB29fRMtlDEwCxcexOzdkUq6LR/vRvHk5pdROcxyOYyW1niq7Gb5pFVGy5R1eBw==, tarball: http://nexus.haier.net/repository/dts-npm-group/hono/-/hono-4.12.6.tgz}
     engines: {node: '>=16.9.0'}
 
+  iconv-lite@0.7.2:
+    resolution: {integrity: sha512-im9DjEDQ55s9fL4EYzOAv0yMqmMBSZp6G0VvFyTMPKWxiSBHUj9NW/qqLmXUwXrrM7AvqSlTCfvqRb0cM8yYqw==}
+    engines: {node: '>=0.10.0'}
+
   immer@7.0.15:
     resolution: {integrity: sha512-yM7jo9+hvYgvdCQdqvhCNRRio0SCXc8xDPzA25SvKWa7b1WVPjLwQs1VYU5JPXjcJPTqAa5NP5dqpORGYBQ2AA==, tarball: http://nexus.haier.net/repository/dts-npm-group/immer/-/immer-7.0.15.tgz}
+
+  is-property@1.0.2:
+    resolution: {integrity: sha512-Ks/IoX00TtClbGQr4TWXemAnktAQvYB7HzcCxDGqEZU6oCmb2INHuOoKxbtR+HFkmYWBKv/dOZtGRiAjDhj92g==}
 
   isexe@3.1.5:
     resolution: {integrity: sha512-6B3tLtFqtQS4ekarvLVMZ+X+VlvQekbe4taUkf/rhVO3d/h0M2rfARm/pXLcPEsjjMsFgrFgSrhQIxcSVrBz8w==, tarball: http://nexus.haier.net/repository/dts-npm-group/isexe/-/isexe-3.1.5.tgz}
@@ -1781,6 +1573,13 @@ packages:
   lodash@4.17.23:
     resolution: {integrity: sha512-LgVTMpQtIopCi79SJeDiP0TfWi5CNEc/L/aRdTh3yIvmZXTnheWpKjSZhnvMl8iXbC1tFg9gdHHDMLoV7CnG+w==, tarball: http://nexus.haier.net/repository/dts-npm-group/lodash/-/lodash-4.17.23.tgz}
 
+  long@5.3.2:
+    resolution: {integrity: sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==}
+
+  lru.min@1.1.4:
+    resolution: {integrity: sha512-DqC6n3QQ77zdFpCMASA1a3Jlb64Hv2N2DciFGkO/4L9+q/IpIAuRlKOvCXabtRW6cQf8usbmM6BE/TOPysCdIA==}
+    engines: {bun: '>=1.0.0', deno: '>=1.30.0', node: '>=8.0.0'}
+
   lucide-react@0.475.0:
     resolution: {integrity: sha512-NJzvVu1HwFVeZ+Gwq2q00KygM1aBhy/ZrhY9FsAgJtpB+E4R7uxRk9M2iKvHa6/vNxZydIB59htha4c2vvwvVg==, tarball: http://nexus.haier.net/repository/dts-npm-group/lucide-react/-/lucide-react-0.475.0.tgz}
     peerDependencies:
@@ -1805,6 +1604,16 @@ packages:
 
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==, tarball: http://nexus.haier.net/repository/dts-npm-group/ms/-/ms-2.1.3.tgz}
+
+  mysql2@3.20.0:
+    resolution: {integrity: sha512-eCLUs7BNbgA6nf/MZXsaBO1SfGs0LtLVrJD3WeWq+jPLDWkSufTD+aGMwykfUVPdZnblaUK1a8G/P63cl9FkKg==}
+    engines: {node: '>= 8.0'}
+    peerDependencies:
+      '@types/node': '>= 8'
+
+  named-placeholders@1.1.6:
+    resolution: {integrity: sha512-Tz09sEL2EEuv5fFowm419c1+a/jSMiBjI9gHxVLrVdbUkkNUUfjsVYs9pVZu5oCon/kmRh9TfLEObFtkVxmY0w==}
+    engines: {node: '>=8.0.0'}
 
   nanoid@3.3.11:
     resolution: {integrity: sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w==, tarball: http://nexus.haier.net/repository/dts-npm-group/nanoid/-/nanoid-3.3.11.tgz}
@@ -1951,6 +1760,9 @@ packages:
   runtime-import@2.2.1:
     resolution: {integrity: sha512-gQyvOInLonTUoEq2D6oQ8Etdyq+qemPO07b7DM073HNloYRIAg4nrWhcGDT2ewDm8iy/5YaJpobx3olEUWLZSw==, tarball: http://nexus.haier.net/repository/dts-npm-group/runtime-import/-/runtime-import-2.2.1.tgz}
 
+  safer-buffer@2.1.2:
+    resolution: {integrity: sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==}
+
   scheduler@0.27.0:
     resolution: {integrity: sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==, tarball: http://nexus.haier.net/repository/dts-npm-group/scheduler/-/scheduler-0.27.0.tgz}
 
@@ -1993,6 +1805,10 @@ packages:
   source-map@0.6.1:
     resolution: {integrity: sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==, tarball: http://nexus.haier.net/repository/dts-npm-group/source-map/-/source-map-0.6.1.tgz}
     engines: {node: '>=0.10.0'}
+
+  sql-escaper@1.3.3:
+    resolution: {integrity: sha512-BsTCV265VpTp8tm1wyIm1xqQCS+Q9NHx2Sr+WcnUrgLrQ6yiDIvHYJV5gHxsj1lMBy2zm5twLaZao8Jd+S8JJw==}
+    engines: {bun: '>=1.0.0', deno: '>=2.0.0', node: '>=12.0.0'}
 
   styled-jsx@5.1.6:
     resolution: {integrity: sha512-qSVyDTeMotdvQYoHWLNGwRFJHC+i+ZvdBRYosOFgC+Wg1vx4frN2/RG/NA7SYqqvKNLf39P2LSRA2pu6n0XYZA==, tarball: http://nexus.haier.net/repository/dts-npm-group/styled-jsx/-/styled-jsx-5.1.6.tgz}
@@ -2096,8 +1912,6 @@ packages:
 snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
-
-  '@anthropic-ai/sdk@0.52.0': {}
 
   '@drizzle-team/brocli@0.10.2': {}
 
@@ -2835,6 +2649,8 @@ snapshots:
 
   argparse@2.0.1: {}
 
+  aws-ssl-profiles@1.1.2: {}
+
   buffer-from@1.1.2: {}
 
   call-bind-apply-helpers@1.0.2:
@@ -2888,6 +2704,8 @@ snapshots:
       has-property-descriptors: 1.0.2
       object-keys: 1.1.1
 
+  denque@2.1.0: {}
+
   detect-libc@2.1.2: {}
 
   drizzle-kit@0.30.6:
@@ -2900,9 +2718,17 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.38.4(@types/react@19.2.14)(postgres@3.4.8)(react@19.2.4):
+  drizzle-orm@0.38.4(@types/react@19.2.14)(mysql2@3.20.0(@types/node@22.19.15))(postgres@3.4.8)(react@19.2.4):
     optionalDependencies:
       '@types/react': 19.2.14
+      mysql2: 3.20.0(@types/node@22.19.15)
+      postgres: 3.4.8
+      react: 19.2.4
+
+  drizzle-orm@0.38.4(@types/react@19.2.14)(mysql2@3.20.0(@types/node@25.4.0))(postgres@3.4.8)(react@19.2.4):
+    optionalDependencies:
+      '@types/react': 19.2.14
+      mysql2: 3.20.0(@types/node@25.4.0)
       postgres: 3.4.8
       react: 19.2.4
 
@@ -3038,6 +2864,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  generate-function@2.3.1:
+    dependencies:
+      is-property: 1.0.2
+
   get-intrinsic@1.3.0:
     dependencies:
       call-bind-apply-helpers: 1.0.2
@@ -3081,7 +2911,13 @@ snapshots:
 
   hono@4.12.6: {}
 
+  iconv-lite@0.7.2:
+    dependencies:
+      safer-buffer: 2.1.2
+
   immer@7.0.15: {}
+
+  is-property@1.0.2: {}
 
   isexe@3.1.5: {}
 
@@ -3161,6 +2997,10 @@ snapshots:
 
   lodash@4.17.23: {}
 
+  long@5.3.2: {}
+
+  lru.min@1.1.4: {}
+
   lucide-react@0.475.0(react@19.2.4):
     dependencies:
       react: 19.2.4
@@ -3185,6 +3025,35 @@ snapshots:
   ms@2.0.0: {}
 
   ms@2.1.3: {}
+
+  mysql2@3.20.0(@types/node@22.19.15):
+    dependencies:
+      '@types/node': 22.19.15
+      aws-ssl-profiles: 1.1.2
+      denque: 2.1.0
+      generate-function: 2.3.1
+      iconv-lite: 0.7.2
+      long: 5.3.2
+      lru.min: 1.1.4
+      named-placeholders: 1.1.6
+      sql-escaper: 1.3.3
+
+  mysql2@3.20.0(@types/node@25.4.0):
+    dependencies:
+      '@types/node': 25.4.0
+      aws-ssl-profiles: 1.1.2
+      denque: 2.1.0
+      generate-function: 2.3.1
+      iconv-lite: 0.7.2
+      long: 5.3.2
+      lru.min: 1.1.4
+      named-placeholders: 1.1.6
+      sql-escaper: 1.3.3
+    optional: true
+
+  named-placeholders@1.1.6:
+    dependencies:
+      lru.min: 1.1.4
 
   nanoid@3.3.11: {}
 
@@ -3361,6 +3230,8 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
+  safer-buffer@2.1.2: {}
+
   scheduler@0.27.0: {}
 
   semver@7.7.4: {}
@@ -3435,6 +3306,8 @@ snapshots:
       source-map: 0.6.1
 
   source-map@0.6.1: {}
+
+  sql-escaper@1.3.3: {}
 
   styled-jsx@5.1.6(react@19.2.4):
     dependencies:
