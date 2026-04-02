@@ -1,22 +1,7 @@
-import type { Domain } from '../types/filing.js';
+/**
+ * @deprecated 领域/行业已改为从 org 表动态加载，不再硬编码
+ * 保留此文件仅为兼容旧引用，实际数据从 /api/org/domains 和 /api/org/industries 获取
+ */
 
-/** 投资领域配置 */
-export const DOMAIN_CONFIG: Record<Domain, {
-  readonly label: string;
-  readonly industries: readonly string[];
-}> = {
-  smart_living: {
-    label: '智慧住居',
-    industries: ['住居科技', '智能家居', '建筑科技'],
-  },
-  industrial_finance: {
-    label: '产业金融',
-    industries: ['金融投资', '融资租赁', '保理'],
-  },
-  health: {
-    label: '大健康',
-    industries: ['医疗科技', '生物制药', '健康管理'],
-  },
-} as const;
-
-export const DOMAINS = Object.keys(DOMAIN_CONFIG) as readonly Domain[];
+export const DOMAIN_CONFIG: Record<string, { readonly label: string; readonly industries: readonly string[] }> = {};
+export const DOMAINS: readonly string[] = [];

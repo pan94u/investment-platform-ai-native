@@ -9,14 +9,8 @@ import { ProjectAutocomplete } from '@/components/project-autocomplete';
 import { api, getCurrentUser } from '@/lib/api';
 import {
   FILING_TYPE_LABELS, PROJECT_STAGE_LABELS, TYPE_ALLOWED_STAGES,
-  DOMAIN_LABELS, APPROVAL_GROUP_LABELS, APPROVAL_GROUPS,
+  APPROVAL_GROUP_LABELS, APPROVAL_GROUPS,
 } from '@/lib/constants';
-
-const INDUSTRIES: Record<string, string[]> = {
-  smart_living: ['住居科技', '智能家居', '建筑科技'],
-  industrial_finance: ['金融投资', '融资租赁', '保理'],
-  health: ['医疗科技', '生物制药', '健康管理'],
-};
 
 export default function EditFilingPage() {
   const { id } = useParams<{ id: string }>();
@@ -25,6 +19,8 @@ export default function EditFilingPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [allUsers, setAllUsers] = useState<Array<{ id: string; name: string; department: string }>>([]);
+  const [domains, setDomains] = useState<Array<{ code: string; name: string }>>([]);
+  const [industries, setIndustries] = useState<Array<{ code: string; name: string }>>([]);
   const [form, setForm] = useState({
     type: '',
     projectStage: '',
@@ -34,6 +30,7 @@ export default function EditFilingPage() {
     projectCode: '',
     legalEntityName: '',
     domain: '',
+    domainCode: '',
     industry: '',
     amount: '',
     investmentRatio: '',
@@ -47,7 +44,15 @@ export default function EditFilingPage() {
 
   useEffect(() => {
     api.getUsers().then((users) => setAllUsers(users.map(u => ({ id: u.id, name: u.name, department: u.department })))).catch(() => {});
+    api.getOrgDomains().then(setDomains).catch(() => {});
   }, []);
+
+  // 领域变化时加载行业
+  useEffect(() => {
+    if (form.domainCode) {
+      api.getOrgIndustries(form.domainCode).then(setIndustries).catch(() => setIndustries([]));
+    }
+  }, [form.domainCode]);
 
   useEffect(() => {
     api.getFiling(id).then((f) => {
@@ -193,15 +198,20 @@ export default function EditFilingPage() {
             </Field>
             <div className="grid grid-cols-2 gap-4">
               <Field label="投资领域" required>
-                <select value={form.domain} onChange={(e) => { update('domain', e.target.value); update('industry', ''); }} className="form-input form-select">
+                <select value={form.domainCode} onChange={(e) => {
+                  const sel = domains.find(d => d.code === e.target.value);
+                  update('domainCode', e.target.value);
+                  update('domain', sel?.name ?? e.target.value);
+                  update('industry', '');
+                }} className="form-input form-select">
                   <option value="">请选择</option>
-                  {Object.entries(DOMAIN_LABELS).map(([k, v]) => (<option key={k} value={k}>{v}</option>))}
+                  {domains.map((d) => (<option key={d.code} value={d.code}>{d.name}</option>))}
                 </select>
               </Field>
               <Field label="行业" required>
                 <select value={form.industry} onChange={(e) => update('industry', e.target.value)} className="form-input form-select">
                   <option value="">请选择</option>
-                  {(INDUSTRIES[form.domain] ?? []).map((i) => (<option key={i} value={i}>{i}</option>))}
+                  {industries.map((i) => (<option key={i.code} value={i.name}>{i.name}</option>))}
                 </select>
               </Field>
             </div>

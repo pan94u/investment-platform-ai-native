@@ -172,6 +172,12 @@ export const api = {
       attachments: Array<{ filename: string; mimeType: string }>;
     }>(`/filings/${filingId}/email-preview`),
 
+  // Org（领域/行业/员工）
+  getOrgDomains: () => requestWithAuth<Array<{ code: string; name: string }>>('/org/domains'),
+  getOrgIndustries: (fieldCode: string) => requestWithAuth<Array<{ code: string; name: string }>>(`/org/industries?fieldCode=${fieldCode}`),
+  searchOrgEmployees: (keyword: string) => requestWithAuth<Array<{ empCode: string; empName: string; fieldName: string; ptName: string; xwName: string }>>(`/org/employees/search?keyword=${encodeURIComponent(keyword)}`),
+  getAuthMe: () => requestWithAuth<{ id: string; empCode: string; name: string; role: string; department: string; domain: string; fieldCode: string; ptName: string }>('/auth/me'),
+
   // Dashboard
   getDashboardStats: () => requestWithAuth<Record<string, unknown>>('/dashboard/stats'),
 

@@ -2,31 +2,47 @@ import { eq, and } from 'drizzle-orm';
 import { users, approvalConfigs } from '@filing/database';
 import type { ApprovalGroupName } from '@filing/shared';
 import { db } from '../lib/db.js';
+import { getEmployeeByCode, getManagerChain } from '../services/org-query.js';
 import type { OrgProvider, ApproverChainContext, ApproverInfo, GroupApproverInfo, ConfirmationInfo } from './types.js';
 
 /**
- * 从本地 users 表 + approval_group_configs 表查审批链
- *
- * 业务侧审批链逻辑:
- *   发起人 → 直线上级(supervisor) → 平台主(admin)
- *   同人捏合: 如果相邻两级是同一人，合并为一级
- *
- * 集团审批组:
- *   优先查 approval_group_configs 表（isActive=true），降级到 users 表
- *
- * 最终确认:
- *   优先查 approval_group_configs where groupName='confirmation'，降级到 admin 用户
+ * 组织数据提供者
+ * 业务侧审批链：从 MySQL org 表 line1_manager_code 逐级上溯
+ * 集团审批组：从 PostgreSQL approval_group_configs 表查
+ * 最终确认：从 approval_group_configs confirmation 组查
  */
 export class DatabaseOrgProvider implements OrgProvider {
   /**
-   * 获取业务侧审批链（逐级上溯）
-   * PoC: supervisor(同域) → admin 的简化模型
-   * 生产: 对接组织中心获取真实汇报链
+   * 获取业务侧审批链（逐级上溯直线经理）
+   * 数据源：MySQL td_hrp2001_emp_org.line1_manager_code
+   * 终止条件：平台主 或 深度 5 级
    */
   async getBusinessApproverChain(ctx: ApproverChainContext): Promise<readonly ApproverInfo[]> {
     const chain: ApproverInfo[] = [];
 
-    // L1: 同域 supervisor
+    // 尝试从 org 表获取真实经理链
+    const managerChain = await getManagerChain(ctx.creatorId, 5);
+
+    if (managerChain.length > 0) {
+      // 真实经理链
+      for (const manager of managerChain) {
+        // 排除发起人自己
+        if (manager.empCode === ctx.creatorId) continue;
+        // 同人捏合
+        const last = chain[chain.length - 1];
+        if (last && last.userId === manager.empCode) continue;
+
+        chain.push({
+          userId: manager.empCode,
+          name: manager.empName,
+          level: chain.length + 1,
+        });
+      }
+
+      if (chain.length > 0) return chain;
+    }
+
+    // 降级：PoC 模式（本地 users 表 supervisor → admin）
     const sameDomainSupervisors = await db
       .select({ id: users.id, name: users.name })
       .from(users)
@@ -36,17 +52,13 @@ export class DatabaseOrgProvider implements OrgProvider {
       ? sameDomainSupervisors
       : await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.role, 'supervisor'));
 
-    if (allSupervisors.length === 0) {
-      throw new Error('未找到上级审批人');
+    if (allSupervisors.length > 0) {
+      const supervisor = allSupervisors[0];
+      if (supervisor.id !== ctx.creatorId) {
+        chain.push({ userId: supervisor.id, name: supervisor.name, level: chain.length + 1 });
+      }
     }
 
-    const supervisor = allSupervisors[0];
-    // 排除发起人自己作为审批人
-    if (supervisor.id !== ctx.creatorId) {
-      chain.push({ userId: supervisor.id, name: supervisor.name, level: chain.length + 1 });
-    }
-
-    // L2: 平台主 (admin) — 如果与 supervisor 不同且不是发起人
     const admins = await db
       .select({ id: users.id, name: users.name })
       .from(users)
@@ -54,9 +66,8 @@ export class DatabaseOrgProvider implements OrgProvider {
 
     if (admins.length > 0) {
       const admin = admins[0];
-      const lastInChain = chain[chain.length - 1];
-      // 同人捏合: 如果 admin === supervisor 或 admin === creator，跳过
-      if (admin.id !== ctx.creatorId && (!lastInChain || admin.id !== lastInChain.userId)) {
+      const last = chain[chain.length - 1];
+      if (admin.id !== ctx.creatorId && (!last || admin.id !== last.userId)) {
         chain.push({ userId: admin.id, name: admin.name, level: chain.length + 1 });
       }
     }
@@ -70,14 +81,13 @@ export class DatabaseOrgProvider implements OrgProvider {
 
   /**
    * 获取集团审批组审批人
-   * 优先查 approval_group_configs 表（isActive=true），降级到 users 表
+   * 优先查 approval_group_configs 表，降级到 users 表
    */
   async getGroupApprovers(groupNames: readonly ApprovalGroupName[]): Promise<readonly GroupApproverInfo[]> {
     if (groupNames.length === 0) return [];
 
     const result: GroupApproverInfo[] = [];
 
-    // 先查配置表
     const configRows = await db
       .select()
       .from(approvalConfigs)
@@ -90,7 +100,6 @@ export class DatabaseOrgProvider implements OrgProvider {
       }
     }
 
-    // 降级用：查 users 表中的 group_approver
     let fallbackUsers: Array<{ id: string; name: string; department: string }> | null = null;
 
     for (const groupName of groupNames) {
@@ -98,7 +107,6 @@ export class DatabaseOrgProvider implements OrgProvider {
       if (config) {
         result.push({ userId: config.userId, name: config.userName, groupName });
       } else {
-        // 降级到 users 表
         if (!fallbackUsers) {
           fallbackUsers = await db
             .select({ id: users.id, name: users.name, department: users.department })
@@ -119,11 +127,9 @@ export class DatabaseOrgProvider implements OrgProvider {
 
   /**
    * 获取最终确认人
-   * 优先查 approval_group_configs where groupName='confirmation'
-   * 降级到 admin 用户
+   * 优先查 approval_group_configs confirmation 组，降级到 admin
    */
   async getConfirmationApprover(): Promise<ConfirmationInfo> {
-    // 先查配置表
     const configRows = await db
       .select()
       .from(approvalConfigs)
@@ -133,7 +139,6 @@ export class DatabaseOrgProvider implements OrgProvider {
       return { userId: configRows[0].userId, name: configRows[0].userName };
     }
 
-    // 降级到 admin
     const admins = await db
       .select({ id: users.id, name: users.name })
       .from(users)

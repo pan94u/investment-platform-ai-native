@@ -28,8 +28,8 @@ export type FilingStatus =
 /** 风险等级 (V3+) */
 export type RiskLevel = 'low' | 'medium' | 'high';
 
-/** 投资领域 */
-export type Domain = 'smart_living' | 'industrial_finance' | 'health';
+/** 投资领域（动态，来自 org 表 field_name） */
+export type Domain = string;
 
 /** 集团审批组名称 */
 export type ApprovalGroupName =

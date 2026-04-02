@@ -8,7 +8,7 @@ import { FileUpload } from '@/components/file-upload';
 import { RichTextDisplay } from '@/components/rich-text-editor';
 import { EmailPreviewModal } from '@/components/email-preview-modal';
 import { api, getCurrentUser } from '@/lib/api';
-import { FILING_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS, DOMAIN_LABELS, PROJECT_STAGE_LABELS, APPROVAL_GROUP_LABELS, STAGE_LABELS } from '@/lib/constants';
+import { FILING_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS, PROJECT_STAGE_LABELS, APPROVAL_GROUP_LABELS, STAGE_LABELS } from '@/lib/constants';
 
 type PendingApproval = {
   approvalId: string;
@@ -236,7 +236,7 @@ export default function FilingDetailPage() {
           <dl className="grid grid-cols-2 gap-x-8 gap-y-5">
             <Info label="备案类型" value={FILING_TYPE_LABELS[filing.type as string] ?? ''} />
             <Info label="项目阶段" value={PROJECT_STAGE_LABELS[filing.projectStage as string] ?? ''} />
-            <Info label="投资领域" value={DOMAIN_LABELS[filing.domain as string] ?? ''} />
+            <Info label="投资领域" value={(filing.domain as string) ?? ''} />
             <Info label="项目名称" value={filing.projectName as string} />
             {filing.projectCode ? <Info label="项目编号" value={filing.projectCode as string} /> : null}
             <Info label="产业" value={filing.industry as string} />

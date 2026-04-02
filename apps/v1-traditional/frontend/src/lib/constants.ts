@@ -42,11 +42,11 @@ export const STATUS_COLORS: Record<string, string> = {
   recalled: 'bg-gray-100 text-gray-500',
 };
 
-export const DOMAIN_LABELS: Record<string, string> = {
-  smart_living: '智慧住居',
-  industrial_finance: '产业金融',
-  health: '大健康',
-};
+/**
+ * @deprecated 领域已改为动态加载，此处保留空对象兼容旧代码
+ * 实际数据从 /api/org/domains 获取
+ */
+export const DOMAIN_LABELS: Record<string, string> = {};
 
 export const APPROVAL_GROUP_LABELS: Record<string, string> = {
   finance: '集团财资',
