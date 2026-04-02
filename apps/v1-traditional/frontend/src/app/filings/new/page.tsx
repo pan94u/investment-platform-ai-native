@@ -75,8 +75,14 @@ export default function NewFilingPage() {
   const [error, setError] = useState('');
   const [chainPreview, setChainPreview] = useState<ChainPreview | null>(null);
   const [chainLoading, setChainLoading] = useState(false);
+  const [allUsers, setAllUsers] = useState<Array<{ id: string; name: string; department: string }>>([]);
 
   const currentUser = getCurrentUser();
+
+  // 加载系统用户列表（用于收件人追加）
+  useEffect(() => {
+    api.getUsers().then((users) => setAllUsers(users.map(u => ({ id: u.id, name: u.name, department: u.department })))).catch(() => {});
+  }, []);
 
   const fetchChain = useCallback(async (domain: string, filingType: string, amount: string, groups: string[]) => {
     if (!domain) return;
@@ -89,6 +95,9 @@ export default function NewFilingPage() {
         approvalGroups: groups.join(','),
       });
       setChainPreview(preview);
+      // 自动填充 emailRecipients = business 链上所有人
+      const businessUserIds = preview.business.map((a: { userId: string }) => a.userId);
+      setForm((prev) => ({ ...prev, emailRecipients: businessUserIds }));
     } catch {
       setChainPreview(null);
     } finally {
@@ -342,6 +351,38 @@ export default function NewFilingPage() {
                       {form.approvalGroups.includes(g) ? '✓ ' : ''}{APPROVAL_GROUP_LABELS[g]}
                     </button>
                   ))}
+                </div>
+              </Field>
+
+              {/* 备案邮件业务收件人 */}
+              <Field label="备案邮件业务收件人">
+                <p className="mb-2 text-xs text-gray-400">备案完成后邮件发送给业务方的人员，默认为审批链上的人</p>
+                <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1.5 min-h-[40px]">
+                  {form.emailRecipients.map((uid) => {
+                    const u = allUsers.find(u => u.id === uid);
+                    return (
+                      <span key={uid} className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs text-blue-700">
+                        {u?.name ?? uid}
+                        <button type="button" onClick={() => update('emailRecipients', form.emailRecipients.filter(r => r !== uid))}
+                          className="ml-0.5 text-blue-400 hover:text-blue-700 leading-none">&times;</button>
+                      </span>
+                    );
+                  })}
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value && !form.emailRecipients.includes(e.target.value)) {
+                        update('emailRecipients', [...form.emailRecipients, e.target.value]);
+                      }
+                      e.target.value = '';
+                    }}
+                    className="flex-1 min-w-[120px] border-none bg-transparent text-sm text-gray-500 outline-none"
+                  >
+                    <option value="">追加收件人...</option>
+                    {allUsers.filter(u => !form.emailRecipients.includes(u.id)).map(u => (
+                      <option key={u.id} value={u.id}>{u.name} — {u.department}</option>
+                    ))}
+                  </select>
                 </div>
               </Field>
             </div>

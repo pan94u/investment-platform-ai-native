@@ -27,8 +27,13 @@ export default function FilingDetailPage() {
   const [approvalComment, setApprovalComment] = useState('');
   const [approvalProcessing, setApprovalProcessing] = useState(false);
   const [emailPreviewOpen, setEmailPreviewOpen] = useState(false);
+  const [allUsers, setAllUsers] = useState<Array<{ id: string; name: string }>>([]);
 
   const user = getCurrentUser();
+
+  useEffect(() => {
+    api.getUsers().then((users) => setAllUsers(users.map(u => ({ id: u.id, name: u.name })))).catch(() => {});
+  }, []);
 
   function loadData() {
     setLoading(true);
@@ -243,6 +248,21 @@ export default function FilingDetailPage() {
             {filing.newTarget ? <Info label="新对赌目标" value={`${Number(filing.newTarget).toLocaleString()} 万元`} /> : null}
             {filing.changeReason ? <Info label="变更原因" value={filing.changeReason as string} span2 /> : null}
             {filing.filingTime ? <Info label="备案时间" value={new Date(filing.filingTime as string).toLocaleString('zh-CN')} /> : null}
+            {((filing.emailRecipients as string[]) ?? []).length > 0 && (
+              <div className="col-span-2">
+                <dt className="text-xs uppercase tracking-wider text-gray-400">备案邮件业务收件人</dt>
+                <dd className="mt-1 flex flex-wrap gap-1.5">
+                  {((filing.emailRecipients as string[]) ?? []).map((uid: string) => {
+                    const u = allUsers.find(u => u.id === uid);
+                    return (
+                      <span key={uid} className="inline-block rounded-full bg-blue-50 px-2.5 py-0.5 text-xs text-blue-700">
+                        {u?.name ?? uid}
+                      </span>
+                    );
+                  })}
+                </dd>
+              </div>
+            )}
           </dl>
         </Section>
 
