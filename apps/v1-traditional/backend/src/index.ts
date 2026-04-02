@@ -8,6 +8,7 @@ import { approvalsRouter } from './routes/approvals.js';
 import { attachmentsRouter } from './routes/attachments.js';
 import { adminRouter } from './routes/admin.js';
 import { strategicRouter } from './routes/strategic.js';
+import { orgRouter } from './routes/org.js';
 import { mockRouter } from './routes/mock.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { webhooksRouter } from './routes/webhooks.js';
@@ -36,6 +37,7 @@ app.route('/api/approvals', approvalsRouter);
 app.route('/api', attachmentsRouter);          // /api/filings/:id/attachments + /api/attachments/:id/*
 app.route('/api/admin', adminRouter);
 app.route('/api/strategic', strategicRouter);
+app.route('/api/org', orgRouter);
 app.route('/api/mock', mockRouter);
 app.route('/api/dashboard', dashboardRouter);
 app.route('/api/webhooks', webhooksRouter);

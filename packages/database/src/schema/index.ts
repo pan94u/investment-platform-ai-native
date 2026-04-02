@@ -5,3 +5,4 @@ export { attachments } from './attachments.js';
 export { auditLogs } from './audit-logs.js';
 export { approvalConfigs } from './approval-configs.js';
 export { emailCcConfigs } from './email-cc-configs.js';
+export { userRoles } from './user-roles.js';
