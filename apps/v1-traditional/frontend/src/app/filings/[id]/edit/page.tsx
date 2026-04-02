@@ -67,6 +67,7 @@ export default function EditFilingPage() {
         projectCode: (f.projectCode as string) || '',
         legalEntityName: (f.legalEntityName as string) || '',
         domain: (f.domain as string) || '',
+        domainCode: (f.domainCode as string) || '',
         industry: (f.industry as string) || '',
         amount: f.amount ? String(Number(f.amount)) : '',
         investmentRatio: f.investmentRatio ? String(Number(f.investmentRatio)) : '',

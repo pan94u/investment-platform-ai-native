@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { getCurrentUser, setCurrentUser } from '@/lib/api';
+import { iamService } from '@/lib/iam-service';
 import { useEffect, useState } from 'react';
 
 const NAV_ITEMS = [
@@ -28,7 +29,8 @@ export function Nav() {
     setUser(u);
   }, [router]);
 
-  function handleLogout() {
+  async function handleLogout() {
+    await iamService.logout();
     setCurrentUser(null);
     router.push('/');
   }
