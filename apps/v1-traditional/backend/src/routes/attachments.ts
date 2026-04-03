@@ -10,10 +10,29 @@ const attachmentsRouter = new Hono<AppEnv>();
 
 attachmentsRouter.use('/*', authMiddleware);
 
-/** POST /api/filings/:filingId/attachments — 上传附件 */
+/** POST /api/attachments/upload-proxy — 仅代理上传到 KWG，返回 URL（不写 DB） */
+attachmentsRouter.post('/attachments/upload-proxy', async (c) => {
+  const iamToken = c.req.header('access-token') ?? '';
+  try {
+    const body = await c.req.parseBody();
+    const file = body['file'];
+    if (!file || !(file instanceof File)) {
+      return c.json({ success: false, data: null, error: '请选择文件' }, 400);
+    }
+    const result = await attachmentService.proxyUpload(file, iamToken);
+    return c.json({ success: true, data: result, error: null });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '上传失败';
+    console.error('[Attachment] 代理上传失败:', message);
+    return c.json({ success: false, data: null, error: message }, 400);
+  }
+});
+
+/** POST /api/filings/:filingId/attachments — 上传附件（上传 + 写 DB） */
 attachmentsRouter.post('/filings/:filingId/attachments', async (c) => {
   const user = c.get('user');
   const filingId = c.req.param('filingId');
+  const iamToken = c.req.header('access-token') ?? '';
 
   try {
     const body = await c.req.parseBody();
@@ -23,10 +42,27 @@ attachmentsRouter.post('/filings/:filingId/attachments', async (c) => {
       return c.json({ success: false, data: null, error: '请选择文件' }, 400);
     }
 
-    const attachment = await attachmentService.uploadAttachment(filingId, file, user.id, user.name);
+    const attachment = await attachmentService.uploadAttachment(filingId, file, user.id, user.name, iamToken);
     return c.json({ success: true, data: attachment, error: null }, 201);
   } catch (err) {
     const message = err instanceof Error ? err.message : '上传失败';
+    return c.json({ success: false, data: null, error: message }, 400);
+  }
+});
+
+/** POST /api/filings/:filingId/attachments/register — 注册已上传的附件（前端直传后调用） */
+attachmentsRouter.post('/filings/:filingId/attachments/register', async (c) => {
+  const user = c.get('user');
+  const filingId = c.req.param('filingId');
+  try {
+    const body = await c.req.json<{ filename: string; url: string; fileSize: number; mimeType: string }>();
+    if (!body.filename || !body.url) {
+      return c.json({ success: false, data: null, error: '缺少 filename 或 url' }, 400);
+    }
+    const attachment = await attachmentService.registerAttachment(filingId, body, user.id, user.name);
+    return c.json({ success: true, data: attachment, error: null }, 201);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '注册失败';
     return c.json({ success: false, data: null, error: message }, 400);
   }
 });

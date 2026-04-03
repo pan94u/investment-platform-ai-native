@@ -478,6 +478,73 @@ docker compose -f infrastructure/docker/docker-compose.v1.yml up -d
 
 ---
 
+## 2026-04-03
+
+### E2E 测试 + 外部系统对接（战投系统 & 投资知识平台）
+
+#### 架构决策：外部系统统一走后端代理
+
+前端只与我们的后端通信，后端负责与两个外部系统的认证换 token 和业务调用。
+
+```
+前端(3100) → 后端(3101) → 战投系统(10.138.68.2:30302)  认证+项目列表
+                         → 投资知识(10.138.68.2:30302/kwg) 认证+文件上传
+```
+
+#### 外部系统对接试错记录（重要经验）
+
+**战投系统** (`STRATEGIC_API_BASE=http://10.138.68.2:30302/api`)
+
+| 试错轮次 | 问题 | 根因 | 修复 |
+|---------|------|------|------|
+| 第1轮 | 项目列表接口无数据返回 | 未做认证，直接裸调业务接口 | 增加 `checkUser` 换 token 流程 |
+| 第2轮 | `checkUser` 返回 token 但代码提取失败 | 响应格式为 `datas.token`（不是 `data.token`） | 兼容 `json.data ?? json.datas` |
+| 第3轮 | 投前接口 `findDealBaseTQList` 返回 E201 | HTTP method 应为 **POST**（代码用了 GET） | 改为 POST + `Content-Type: application/json` |
+| 第4轮 | 投前接口返回 E353 | POST 缺少 `Content-Type` 和 body | 加 `Content-Type: application/json` + body `{}` |
+| 第5轮 | 换 token 成功、接口有响应但前端无数据 | 响应格式为 `{ total, rows: [...] }` 而非 `{ data: { list: [...] } }` | 解析逻辑兼容 `rows` |
+| ✅ 第6轮 | **投前674 + 投后101 + 退出18 = 793个项目，前端联想正常** | — | — |
+
+**投资知识平台(KWG)** (`KWG_API_BASE=http://10.138.68.2:30302/kwg`)
+
+| 试错轮次 | 问题 | 根因 | 修复 |
+|---------|------|------|------|
+| 第1轮 | 前端直传外部地址 CORS 拦截 / 超时 | 不应前端直调，应走后端代理 | 改为后端代理架构 |
+| 第2轮 | 认证头 `Access-Token` 被拒 | 应使用 `Authorization: Bearer <token>` | 修正 header |
+| 第3轮 | 上传地址错误 `prehsip.haier.net/kwg` | 测试环境上传地址实际是 `10.138.68.2:30302/kwg` | 改 `KWG_API_BASE` |
+| 第4轮 | `getTokenByIam` 返回 401 | 待确认：参数名/IAM token 格式/权限问题 | ⏳ 等系统方反馈 |
+
+**关键经验编码**：
+1. 海尔内部系统 API 响应格式不统一：`data` / `datas` / `rows` / `list` 都可能出现，必须全部兼容
+2. HTTP method 不能想当然，必须严格按接口文档（投前是 POST 不是 GET）
+3. POST 请求即使无参数也要带 `Content-Type: application/json` + 空 body `{}`
+4. `checkUser` 换 token 是必须步骤，不能跳过直接调业务接口
+5. 测试/生产环境地址可能完全不同主机，不能假设同域名不同路径
+
+#### 文件上传架构重构
+
+- 前端 `file-upload.tsx`：从直传外部改为调后端 `/api/attachments/upload-proxy`
+- 后端新增 `proxyUpload()` 服务：接收文件 → KWG 换 token → 代理上传 → 返回 URL
+- 后端新增 `POST /api/attachments/upload-proxy` 路由
+- 新建表单流程：选文件即上传 → 拿到 URL → 创建 filing 后 `registerAttachment`
+
+#### Bug 清单更新
+
+| # | 描述 | 状态 |
+|---|------|------|
+| BUG-001 | IAM 字段映射：account≠工号，userName=工号，nickName=姓名 | ✅ 已修复 |
+| BUG-002 | 邮件收件人只显示工号不显示姓名 | 📋 待修 |
+| BUG-003 | 追加收件人是 PoC 固定列表，应实时检索 org 表 | 📋 待修 |
+| BUG-004 | FK 约束阻止 INSERT（creator_id/approver_id/uploaded_by） | ✅ 已修复 |
+| BUG-005 | 文件上传架构改后端代理 | ✅ 已修复 |
+| BUG-006 | getAttachments uploaderName 始终 null（leftJoin 类型不匹配） | 📋 待修 |
+| BUG-007 | 项目名称联想无候选项 | ✅ 已修复（响应格式+method+认证） |
+| BUG-008 | 文件上传报错（KWG getTokenByIam 401） | ⏳ 等系统方确认 |
+
+#### 统计快照
+- 文件变更：~15 个文件
+- 战投项目数据：投前 674 + 投后 101 + 退出 18 = 793
+- E2E 进度：TC-2.1 ✅ TC-2.2 部分通过（项目联想 ✅ 上传 ⏳）
+
 <!-- 模板：复制以下内容用于新一天的记录
 
 ## YYYY-MM-DD

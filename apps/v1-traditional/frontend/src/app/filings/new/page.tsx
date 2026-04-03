@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Nav } from '@/components/nav';
 import { FileUpload } from '@/components/file-upload';
-import type { FileUploadHandle } from '@/components/file-upload';
+import type { UploadedFileRef } from '@/components/file-upload';
 import { RichTextEditor } from '@/components/rich-text-editor';
 import { ProjectAutocomplete } from '@/components/project-autocomplete';
 import { api, getCurrentUser } from '@/lib/api';
@@ -45,7 +45,7 @@ type ChainPreview = {
 export default function NewFilingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const fileUploadRef = useRef<FileUploadHandle>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFileRef[]>([]);
   const [form, setForm] = useState({
     type: '',
     projectStage: '',
@@ -159,9 +159,9 @@ export default function NewFilingPage() {
       const filing = await api.createFiling(data);
       const filingId = filing.id as string;
 
-      // 2. 上传暂存的附件
-      if (fileUploadRef.current) {
-        await fileUploadRef.current.uploadPendingFiles(filingId);
+      // 2. 注册已上传的附件
+      for (const f of uploadedFiles) {
+        await api.registerAttachment(filingId, f);
       }
 
       // 3. 提交或跳转
@@ -343,7 +343,7 @@ export default function NewFilingPage() {
 
               {/* 备案文件 */}
               <Field label="备案文件">
-                <FileUpload ref={fileUploadRef} />
+                <FileUpload onFilesChange={setUploadedFiles} />
               </Field>
 
               {/* 审批组勾选 */}

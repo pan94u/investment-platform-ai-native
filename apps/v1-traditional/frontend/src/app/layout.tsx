@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { IAMProvider } from '@/components/iam-provider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -19,7 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className="min-h-screen bg-[#FAFAF9] text-gray-900 antialiased"
         style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif", fontFeatureSettings: "'cv11', 'ss01'" }}
       >
-        {children}
+        <IAMProvider>{children}</IAMProvider>
       </body>
     </html>
   );

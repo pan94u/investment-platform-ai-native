@@ -187,6 +187,11 @@ export const api = {
     formData.append('file', file)
     return requestUpload<Record<string, unknown>>(`/filings/${filingId}/attachments`, formData)
   },
+  registerAttachment: (filingId: string, data: { filename: string; url: string; fileSize: number; mimeType: string }) =>
+    requestWithAuth<Record<string, unknown>>(`/filings/${filingId}/attachments/register`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   getAttachments: (filingId: string) =>
     requestWithAuth<Array<{ id: string; filingId: string; filename: string; filePath: string; fileSize: number; mimeType: string; uploadedBy: string; uploaderName: string | null; createdAt: string }>>(`/filings/${filingId}/attachments`),
   downloadAttachment: (id: string, filePath?: string) => {
