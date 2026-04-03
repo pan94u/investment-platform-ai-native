@@ -38,9 +38,10 @@ export function IAMProvider({ children }: { children: ReactNode }) {
         }
 
         // 4. 提取工号
+        // Haier IAM: userName = 工号(emp_code), account = IAM内部ID, nickName = 显示姓名
         const empCode = (
+          iamUser?.userName ??
           iamUser?.empCode ??
-          iamUser?.account ??
           iamUser?.userCode ??
           iamUser?.sub
         ) as string | undefined
@@ -67,7 +68,7 @@ export function IAMProvider({ children }: { children: ReactNode }) {
             setCurrentUser({
               id: empCode,
               username: empCode,
-              name: (iamUser?.name ?? iamUser?.userName ?? empCode) as string,
+              name: (iamUser?.nickName ?? iamUser?.name ?? empCode) as string,
               role: 'initiator',
               department: (iamUser?.deptName ?? '') as string,
               domain: '',
