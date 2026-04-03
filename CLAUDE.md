@@ -47,7 +47,20 @@
 
 ## 已知陷阱
 
-（随项目推进积累）
+### 海尔内部系统 API 对接（已验证，6轮试错）
+
+- 认证必须两步走：IAM token → `checkUser`/`getTokenByIam` 换系统 token → 再调业务接口
+- 响应格式不统一：`data` / `datas` / `rows` / `list` 都可能，代码必须全部兼容
+- HTTP method 严格按接口文档，不能想当然（投前项目集是 POST 不是 GET）
+- POST 请求即使无参数也要带 `Content-Type: application/json` + 空 body `{}`
+- 测试/生产环境地址可能完全不同主机（`10.138.68.2:30302` vs `hsip.haier.net`），不能假设同域名
+- 统一走后端代理，前端不直接调外部系统（避免 CORS + 认证复杂度）
+
+### IAM 字段映射（已验证）
+
+- `userName` = 工号（emp_code），不是用户名
+- `nickName` = 显示姓名
+- `account` = IAM 内部 ID，不是工号
 
 ## Forge 经验教训（已验证）
 
