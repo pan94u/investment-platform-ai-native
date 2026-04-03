@@ -41,7 +41,7 @@ export const filings = pgTable('filings', {
   projectCode: varchar('project_code', { length: 50 }),        // 项目编号
 
   // 关联
-  creatorId: text('creator_id').notNull().references(() => users.id),
+  creatorId: text('creator_id').notNull(), // emp_code，不再引用本地 users 表
 
   // 时间
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

@@ -1,11 +1,10 @@
 import { pgTable, text, timestamp, varchar, integer } from 'drizzle-orm/pg-core';
 import { filings } from './filings.js';
-import { users } from './users.js';
 
 export const approvals = pgTable('approvals', {
   id: text('id').primaryKey(),
   filingId: text('filing_id').notNull().references(() => filings.id),
-  approverId: text('approver_id').notNull().references(() => users.id),
+  approverId: text('approver_id').notNull(), // emp_code，不再引用本地 users 表
   approverName: varchar('approver_name', { length: 100 }).notNull(),
 
   // 审批阶段与层级
