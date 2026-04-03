@@ -1,3 +1,4 @@
+import { createDecipheriv } from 'node:crypto';
 import mysql from 'mysql2/promise';
 
 /**
@@ -5,10 +6,25 @@ import mysql from 'mysql2/promise';
  * 数据源：MySQL jbs_haier2.td_hrp2001_emp_org（只读）
  */
 
+/** AES-128-ECB PKCS5 解密，密文为十六进制字符串 */
+const EMAIL_KEY = Buffer.from('A850103003014ECB', 'utf8'); // 16 bytes = AES-128
+
+function decryptEmail(hex: string): string {
+  if (!hex || hex.includes('@')) return hex; // 已是明文
+  try {
+    const decipher = createDecipheriv('aes-128-ecb', EMAIL_KEY, null);
+    const encrypted = Buffer.from(hex, 'hex');
+    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+    return decrypted.toString('utf8');
+  } catch {
+    return hex; // 解密失败返回原值
+  }
+}
+
 export interface Employee {
   empCode: string;
   empName: string;
-  entEmail: string;        // 可能是加密值
+  entEmail: string;        // 已解密
   fieldCode: string;       // 生态圈代码 → 领域
   fieldName: string;       // 生态圈名称 → 领域
   ptCode: string;          // 平台代码 → 行业
@@ -76,7 +92,7 @@ export async function getEmployeeByCode(empCode: string): Promise<Employee | nul
       return {
         empCode: r.emp_code,
         empName: r.emp_name,
-        entEmail: r.ent_email ?? '',
+        entEmail: decryptEmail(r.ent_email ?? ''),
         fieldCode: r.field_code ?? '',
         fieldName: r.field_name ?? '',
         ptCode: r.pt_code ?? '',
@@ -121,7 +137,7 @@ export async function getEmployeesByCode(empCodes: string[]): Promise<Map<string
         const emp: Employee = {
           empCode: r.emp_code,
           empName: r.emp_name,
-          entEmail: r.ent_email ?? '',
+          entEmail: decryptEmail(r.ent_email ?? ''),
           fieldCode: r.field_code ?? '',
           fieldName: r.field_name ?? '',
           ptCode: r.pt_code ?? '',
@@ -212,17 +228,18 @@ export async function getIndustriesByDomain(fieldCode: string): Promise<DomainIt
 export async function searchEmployees(keyword: string, limit = 20): Promise<Employee[]> {
   if (!keyword || keyword.length < 2) return [];
   try {
+    const safeLimit = Math.min(Math.max(1, Math.floor(limit)), 100);
     const [rows] = await getPool().execute(
       `SELECT emp_code, emp_name, ent_email, field_code, field_name, pt_code, pt_name, xw_name, three_type_person, line1_manager_code, line1_manager_name
        FROM td_hrp2001_emp_org
        WHERE emp_name LIKE ? OR emp_code LIKE ?
-       LIMIT ?`,
-      [`%${keyword}%`, `%${keyword}%`, limit],
+       LIMIT ${safeLimit}`,
+      [`%${keyword}%`, `%${keyword}%`],
     );
     return (rows as Record<string, string>[]).map(r => ({
       empCode: r.emp_code,
       empName: r.emp_name,
-      entEmail: r.ent_email ?? '',
+      entEmail: decryptEmail(r.ent_email ?? ''),
       fieldCode: r.field_code ?? '',
       fieldName: r.field_name ?? '',
       ptCode: r.pt_code ?? '',

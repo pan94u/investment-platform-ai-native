@@ -27,13 +27,40 @@ export default function FilingDetailPage() {
   const [approvalComment, setApprovalComment] = useState('');
   const [approvalProcessing, setApprovalProcessing] = useState(false);
   const [emailPreviewOpen, setEmailPreviewOpen] = useState(false);
-  const [allUsers, setAllUsers] = useState<Array<{ id: string; name: string }>>([]);
+  const [recipientNames, setRecipientNames] = useState<Map<string, string>>(new Map());
+  const [chainPreview, setChainPreview] = useState<{
+    business: Array<{ userId: string; name: string; level: number }>;
+    group: Array<{ userId: string; name: string; groupName: string }>;
+    confirmation: { userId: string; name: string };
+  } | null>(null);
 
   const user = getCurrentUser();
 
+  // 邮件收件人姓名：从审批链预览 + 搜索 API 解析
   useEffect(() => {
-    api.getUsers().then((users) => setAllUsers(users.map(u => ({ id: u.id, name: u.name })))).catch(() => {});
-  }, []);
+    if (!filing) return;
+    const recipients = (filing.emailRecipients as string[]) ?? [];
+    if (recipients.length === 0) return;
+    // 逐个搜索（emp_code 精确匹配）
+    Promise.all(recipients.map(code =>
+      api.searchUsers(code).then(list => {
+        const match = list.find(u => u.id === code || u.empCode === code);
+        return match ? [code, match.name] as const : null;
+      }).catch(() => null)
+    )).then(results => {
+      const map = new Map<string, string>();
+      for (const r of results) {
+        if (r) map.set(r[0], r[1]);
+      }
+      // 合并审批链预览的名称
+      if (chainPreview) {
+        for (const b of chainPreview.business) map.set(b.userId, b.name);
+        for (const g of chainPreview.group) map.set(g.userId, g.name);
+        map.set(chainPreview.confirmation.userId, chainPreview.confirmation.name);
+      }
+      setRecipientNames(map);
+    });
+  }, [filing, chainPreview]);
 
   function loadData() {
     setLoading(true);
@@ -41,6 +68,16 @@ export default function FilingDetailPage() {
       .then(([f, h]) => {
         setFiling(f);
         setApprovalHistory(h as Array<Record<string, unknown>>);
+
+        // 加载完整审批链预览
+        if (f && f.status !== 'draft') {
+          api.getApprovalChainPreview({
+            domain: f.domain as string,
+            filingType: f.type as string,
+            amount: String(f.amount ?? '0'),
+            approvalGroups: ((f.approvalGroups as string[]) ?? []).join(','),
+          }).then(setChainPreview).catch(() => {});
+        }
 
         // 查找当前用户在这个 filing 上的 pending 审批
         const history = h as Array<Record<string, unknown>>;
@@ -252,14 +289,11 @@ export default function FilingDetailPage() {
               <div className="col-span-2">
                 <dt className="text-xs uppercase tracking-wider text-gray-400">备案邮件业务收件人</dt>
                 <dd className="mt-1 flex flex-wrap gap-1.5">
-                  {((filing.emailRecipients as string[]) ?? []).map((uid: string) => {
-                    const u = allUsers.find(u => u.id === uid);
-                    return (
-                      <span key={uid} className="inline-block rounded-full bg-blue-50 px-2.5 py-0.5 text-xs text-blue-700">
-                        {u?.name ?? uid}
-                      </span>
-                    );
-                  })}
+                  {((filing.emailRecipients as string[]) ?? []).map((uid: string) => (
+                    <span key={uid} className="inline-block rounded-full bg-blue-50 px-2.5 py-0.5 text-xs text-blue-700">
+                      {recipientNames.get(uid) ?? uid}
+                    </span>
+                  ))}
                 </dd>
               </div>
             )}
@@ -305,63 +339,14 @@ export default function FilingDetailPage() {
           </div>
         </Section>
 
-        {/* Approval timeline */}
-        {approvalHistory.length > 0 && (
-          <Section title="审批记录">
-            <div className="relative ml-0.5">
-              <div className="absolute left-[3.5px] top-2 bottom-2 w-px bg-gray-200" />
-              <div className="space-y-4">
-                {approvalHistory.map((a) => {
-                  const status = a.status as string;
-                  const dotColor =
-                    status === 'approved' || status === 'acknowledged'
-                      ? 'bg-emerald-500'
-                      : status === 'rejected'
-                        ? 'bg-red-500'
-                        : 'bg-amber-400';
-
-                  const stageLabel = STAGE_LABELS[a.stage as string] ?? (a.stage as string);
-                  const groupLabel = a.groupName ? ` · ${APPROVAL_GROUP_LABELS[a.groupName as string] ?? a.groupName}` : '';
-
-                  return (
-                    <div key={a.id as string} className="relative flex gap-3.5 pl-5">
-                      <div className={`absolute left-0 top-1.5 h-2 w-2 rounded-full ring-2 ring-white ${dotColor}`} />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="font-medium text-gray-700">
-                            {a.approverName as string}
-                          </span>
-                          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-400">
-                            {stageLabel}{groupLabel}
-                          </span>
-                          <span
-                            className={`text-xs font-medium ${
-                              status === 'approved' ? 'text-emerald-600' :
-                              status === 'acknowledged' ? 'text-blue-600' :
-                              status === 'rejected' ? 'text-red-500' : 'text-amber-600'
-                            }`}
-                          >
-                            {status === 'approved' ? '已同意' :
-                             status === 'acknowledged' ? '已知悉' :
-                             status === 'rejected' ? '已驳回' : '待审批'}
-                          </span>
-                        </div>
-                        {a.comment ? (
-                          <p className="mt-0.5 text-sm text-gray-500">
-                            {a.comment as string}
-                          </p>
-                        ) : null}
-                        {a.decidedAt ? (
-                          <p className="mt-0.5 text-xs text-gray-400">
-                            {new Date(a.decidedAt as string).toLocaleString('zh-CN')}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+        {/* 审批链路（完整链 + 实际记录合并） */}
+        {(chainPreview || approvalHistory.length > 0) && (
+          <Section title="审批链路">
+            <ApprovalTimeline
+              chain={chainPreview}
+              history={approvalHistory}
+              creatorName={(creator?.name as string) ?? ''}
+            />
           </Section>
         )}
 
@@ -411,6 +396,150 @@ function Info({
       <dd className={`mt-0.5 text-sm ${highlight ? 'font-semibold text-gray-800' : 'text-gray-700'}`}>
         {value || '-'}
       </dd>
+    </div>
+  );
+}
+
+/** 完整审批链路时间线：合并预览链 + 实际审批记录 */
+function ApprovalTimeline({
+  chain,
+  history,
+  creatorName,
+}: {
+  chain: {
+    business: Array<{ userId: string; name: string; level: number }>;
+    group: Array<{ userId: string; name: string; groupName: string }>;
+    confirmation: { userId: string; name: string };
+  } | null;
+  history: Array<Record<string, unknown>>;
+  creatorName: string;
+}) {
+  // 构建完整步骤列表
+  type Step = {
+    key: string;
+    name: string;
+    label: string;
+    status: 'approved' | 'rejected' | 'acknowledged' | 'pending' | 'future';
+    comment?: string;
+    decidedAt?: string;
+  };
+
+  const historyMap = new Map<string, Record<string, unknown>>();
+  for (const h of history) {
+    // 用 stage+level+groupName 做 key 匹配
+    const k = `${h.stage}-${h.level ?? 0}-${h.groupName ?? ''}`;
+    historyMap.set(k, h);
+    // 也按 approverId 匹配
+    historyMap.set(`uid-${h.approverId}`, h);
+  }
+
+  function findHistory(stage: string, level: number, groupName: string, userId: string): Record<string, unknown> | undefined {
+    return historyMap.get(`${stage}-${level}-${groupName}`) ?? historyMap.get(`uid-${userId}`);
+  }
+
+  const steps: Step[] = [];
+
+  // 发起人
+  steps.push({ key: 'creator', name: creatorName || '发起人', label: '发起人', status: 'approved' });
+
+  if (chain) {
+    // 业务审批链
+    for (const b of chain.business) {
+      const h = findHistory('business', b.level, '', b.userId);
+      const status = h ? (h.status as Step['status']) : 'future';
+      steps.push({
+        key: `business-${b.level}`,
+        name: b.name,
+        label: `业务 L${b.level}`,
+        status,
+        comment: h?.comment as string | undefined,
+        decidedAt: h?.decidedAt as string | undefined,
+      });
+    }
+
+    // 集团审批组
+    for (const g of chain.group) {
+      const h = findHistory('group', 0, g.groupName, g.userId);
+      const status = h ? (h.status as Step['status']) : 'future';
+      steps.push({
+        key: `group-${g.groupName}`,
+        name: g.name,
+        label: APPROVAL_GROUP_LABELS[g.groupName] ?? g.groupName,
+        status,
+        comment: h?.comment as string | undefined,
+        decidedAt: h?.decidedAt as string | undefined,
+      });
+    }
+
+    // 确认人
+    const ch = findHistory('confirmation', 0, '', chain.confirmation.userId);
+    steps.push({
+      key: 'confirmation',
+      name: chain.confirmation.name,
+      label: '确认人',
+      status: ch ? (ch.status as Step['status']) : 'future',
+      comment: ch?.comment as string | undefined,
+      decidedAt: ch?.decidedAt as string | undefined,
+    });
+  } else {
+    // 无预览链，仅展示已有历史
+    for (const h of history) {
+      const stageLabel = STAGE_LABELS[h.stage as string] ?? (h.stage as string);
+      const groupLabel = h.groupName ? ` · ${APPROVAL_GROUP_LABELS[h.groupName as string] ?? h.groupName}` : '';
+      steps.push({
+        key: h.id as string,
+        name: h.approverName as string,
+        label: `${stageLabel}${groupLabel}`,
+        status: h.status as Step['status'],
+        comment: h.comment as string | undefined,
+        decidedAt: h.decidedAt as string | undefined,
+      });
+    }
+  }
+
+  const statusConfig = {
+    approved: { dot: 'bg-emerald-500', text: 'text-emerald-600', label: '已同意' },
+    acknowledged: { dot: 'bg-blue-500', text: 'text-blue-600', label: '已知悉' },
+    rejected: { dot: 'bg-red-500', text: 'text-red-500', label: '已驳回' },
+    pending: { dot: 'bg-amber-400', text: 'text-amber-600', label: '待审批' },
+    future: { dot: 'bg-gray-200', text: 'text-gray-300', label: '未到达' },
+  };
+
+  return (
+    <div className="relative ml-0.5">
+      <div className="absolute left-[3.5px] top-2 bottom-2 w-px bg-gray-200" />
+      <div className="space-y-4">
+        {steps.map((s) => {
+          const cfg = statusConfig[s.status];
+          return (
+            <div key={s.key} className="relative flex gap-3.5 pl-5">
+              <div className={`absolute left-0 top-1.5 h-2 w-2 rounded-full ring-2 ring-white ${cfg.dot}`} />
+              <div className="flex-1">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className={`font-medium ${s.status === 'future' ? 'text-gray-300' : 'text-gray-700'}`}>
+                    {s.name}
+                  </span>
+                  <span className={`rounded px-1.5 py-0.5 text-xs ${s.status === 'future' ? 'bg-gray-50 text-gray-300' : 'bg-gray-100 text-gray-400'}`}>
+                    {s.label}
+                  </span>
+                  <span className={`text-xs font-medium ${cfg.text}`}>
+                    {cfg.label}
+                  </span>
+                </div>
+                {s.comment ? <p className="mt-0.5 text-sm text-gray-500">{s.comment}</p> : null}
+                {s.decidedAt ? <p className="mt-0.5 text-xs text-gray-400">{new Date(s.decidedAt).toLocaleString('zh-CN')}</p> : null}
+              </div>
+            </div>
+          );
+        })}
+        {/* 完成标记 */}
+        <div className="relative flex gap-3.5 pl-5">
+          <div className={`absolute left-0 top-1.5 h-2 w-2 rounded-full ring-2 ring-white ${steps.every(s => s.status === 'approved' || s.status === 'acknowledged') ? 'bg-emerald-500' : 'bg-gray-200'}`} />
+          <span className={`text-sm font-medium ${steps.every(s => s.status === 'approved' || s.status === 'acknowledged') ? 'text-emerald-600' : 'text-gray-300'}`}>
+            完成
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,9 +1,10 @@
 import { eq } from 'drizzle-orm';
-import { filings, users, approvals, attachments, emailCcConfigs } from '@filing/database';
+import { filings, approvals, attachments, emailCcConfigs } from '@filing/database';
 import { FILING_TYPE_CONFIG, APPROVAL_GROUP_CONFIG, PROJECT_STAGE_CONFIG } from '@filing/shared';
 import { db } from '../lib/db.js';
 import { getEmailProvider } from '../providers/index.js';
 import * as auditService from './audit.js';
+import { getEmployeeByCode, getEmployeesByCode } from './org-query.js';
 
 export interface EmailPreviewData {
   to: Array<{ email: string; name: string; userId?: string }>;
@@ -17,19 +18,18 @@ export interface EmailPreviewData {
  * 获取邮件预览数据（不发送）
  */
 export async function getEmailPreview(filingId: string): Promise<EmailPreviewData | null> {
-  // 1. 查 filing + 创建者
+  // 1. 查 filing + 创建者（从 org 表）
   const filingRows = await db
     .select()
     .from(filings)
-    .leftJoin(users, eq(filings.creatorId, users.id))
     .where(eq(filings.id, filingId));
 
   if (filingRows.length === 0) return null;
 
-  const filing = filingRows[0].filings;
-  const creator = filingRows[0].users;
+  const filing = filingRows[0];
+  const creator = await getEmployeeByCode(filing.creatorId);
 
-  // 2. 收集收件人（带姓名）
+  // 2. 收集收件人（带姓名）— 从 org 表批量查
   const toList: Array<{ email: string; name: string; userId?: string }> = [];
   const seenEmails = new Set<string>();
 
@@ -40,29 +40,35 @@ export async function getEmailPreview(filingId: string): Promise<EmailPreviewDat
     .where(eq(approvals.filingId, filingId));
 
   const approverIds = [...new Set(approvalRows.map(a => a.approverId))];
-  for (const approverId of approverIds) {
-    const userRows = await db.select({ id: users.id, email: users.email, name: users.name }).from(users).where(eq(users.id, approverId)).limit(1);
-    const u = userRows[0];
-    if (u?.email && !seenEmails.has(u.email)) {
-      seenEmails.add(u.email);
-      toList.push({ email: u.email, name: u.name, userId: u.id });
+
+  // 来源 2: 表单指定收件人
+  const emailRecipientIds = (filing.emailRecipients ?? []) as string[];
+
+  // 合并所有 emp_code，一次批量查询
+  const allEmpCodes = [...new Set([...approverIds, ...emailRecipientIds, filing.creatorId].filter(Boolean))];
+  const empMap = allEmpCodes.length > 0 ? await getEmployeesByCode(allEmpCodes) : new Map();
+
+  // 审批链上的人
+  for (const empCode of approverIds) {
+    const emp = empMap.get(empCode);
+    if (emp?.entEmail && !seenEmails.has(emp.entEmail)) {
+      seenEmails.add(emp.entEmail);
+      toList.push({ email: emp.entEmail, name: emp.empName, userId: empCode });
     }
   }
 
   // 创建者
-  if (creator?.email && !seenEmails.has(creator.email)) {
-    seenEmails.add(creator.email);
-    toList.push({ email: creator.email, name: creator.name, userId: creator.id });
+  if (creator?.entEmail && !seenEmails.has(creator.entEmail)) {
+    seenEmails.add(creator.entEmail);
+    toList.push({ email: creator.entEmail, name: creator.empName, userId: filing.creatorId });
   }
 
-  // 来源 2: 表单指定收件人
-  const emailRecipientIds = (filing.emailRecipients ?? []) as string[];
-  for (const recipientId of emailRecipientIds) {
-    const userRows = await db.select({ id: users.id, email: users.email, name: users.name }).from(users).where(eq(users.id, recipientId)).limit(1);
-    const u = userRows[0];
-    if (u?.email && !seenEmails.has(u.email)) {
-      seenEmails.add(u.email);
-      toList.push({ email: u.email, name: u.name, userId: u.id });
+  // 表单指定收件人
+  for (const empCode of emailRecipientIds) {
+    const emp = empMap.get(empCode);
+    if (emp?.entEmail && !seenEmails.has(emp.entEmail)) {
+      seenEmails.add(emp.entEmail);
+      toList.push({ email: emp.entEmail, name: emp.empName, userId: empCode });
     }
   }
 
@@ -93,7 +99,7 @@ export async function getEmailPreview(filingId: string): Promise<EmailPreviewDat
     domain: filing.domain,
     industry: filing.industry,
     description: filing.description,
-    creatorName: creator?.name ?? '-',
+    creatorName: creator?.empName ?? '-',
     approvalGroups: approvalGroups.map(g => APPROVAL_GROUP_CONFIG[g as keyof typeof APPROVAL_GROUP_CONFIG]?.label ?? g),
   });
 

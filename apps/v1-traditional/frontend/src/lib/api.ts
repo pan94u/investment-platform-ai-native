@@ -117,6 +117,8 @@ export function setCurrentUser(user: { id: string; username: string; name: strin
 
 export const api = {
   getUsers: () => requestWithAuth<Array<{ id: string; username: string; name: string; role: string; department: string; domain: string }>>('/auth/users'),
+  searchUsers: (keyword: string) =>
+    requestWithAuth<Array<{ id: string; empCode: string; name: string; department: string; domain: string }>>(`/auth/users?keyword=${encodeURIComponent(keyword)}`),
   login: (username: string, password: string) =>
     requestWithAuth<{ token: string; user: { id: string; username: string; name: string; role: string; department: string; domain: string } }>('/auth/login', {
       method: 'POST',

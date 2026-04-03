@@ -1,5 +1,6 @@
 import { eq, and, ilike, gte, lte, sql, desc, count } from 'drizzle-orm';
-import { filings, approvals, users } from '@filing/database';
+import { filings, approvals } from '@filing/database';
+import { getEmployeeByCode } from './org-query.js';
 import type { CreateFilingRequest, UpdateFilingRequest, FilingQueryParams, ApprovalGroupName } from '@filing/shared';
 import { db } from '../lib/db.js';
 import { generateId, generateFilingNumber } from '../lib/id.js';
@@ -129,16 +130,17 @@ export async function getFilingById(id: string) {
   const result = await db
     .select()
     .from(filings)
-    .leftJoin(users, eq(filings.creatorId, users.id))
     .where(eq(filings.id, resolvedId))
     .limit(1);
 
   if (result.length === 0) return null;
 
-  const { filings: filing, users: creator } = result[0];
+  const filing = result[0];
+  // 从 org 表查创建人信息
+  const creator = filing.creatorId ? await getEmployeeByCode(filing.creatorId) : null;
   return {
     ...filing,
-    creator: creator ? { id: creator.id, name: creator.name, department: creator.department } : null,
+    creator: creator ? { id: creator.empCode, name: creator.empName, department: creator.xwName || creator.ptName } : null,
   };
 }
 
@@ -183,24 +185,20 @@ export async function queryFilings(params: FilingQueryParams) {
  * 3. 推送待办通知
  * 4. 状态变更: draft → pending_business
  */
-export async function submitFiling(filingId: string, userId: string, userName: string) {
+export async function submitFiling(filingId: string, user: { id: string; name: string; department: string; domain: string }) {
   const existing = await db.select().from(filings).where(eq(filings.id, filingId)).limit(1);
   if (existing.length === 0) throw new Error('备案不存在');
   if (existing[0].status !== 'draft') throw new Error('仅草稿状态可提交');
-  if (existing[0].creatorId !== userId) throw new Error('无权提交此备案');
+  if (existing[0].creatorId !== user.id) throw new Error('无权提交此备案');
 
   const filing = existing[0];
 
-  // 获取创建人信息
-  const creatorRows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-  const creator = creatorRows[0];
-
-  // 通过 OrgProvider 获取业务侧审批链
+  // 通过 OrgProvider 获取业务侧审批链（user 信息来自 auth 中间件，源于 org 表）
   const orgProvider = getOrgProvider();
   const chain = await orgProvider.getBusinessApproverChain({
-    creatorId: userId,
-    creatorDepartment: creator.department,
-    creatorDomain: creator.domain,
+    creatorId: user.id,
+    creatorDepartment: user.department,
+    creatorDomain: user.domain,
     filingType: filing.type,
     amount: filing.amount,
   });
@@ -234,7 +232,7 @@ export async function submitFiling(filingId: string, userId: string, userName: s
     approverName: firstApprover.name,
     stage: 'business',
     level: 1,
-    creatorName: userName,
+    creatorName: user.name,
     amount: filing.amount,
     filingType: filing.type,
   });
@@ -254,8 +252,8 @@ export async function submitFiling(filingId: string, userId: string, userName: s
     action: 'filing_submitted',
     entityType: 'filing',
     entityId: filingId,
-    userId,
-    userName,
+    userId: user.id,
+    userName: user.name,
     detail: {
       businessChainLength: chain.length,
       firstApprover: firstApprover.name,

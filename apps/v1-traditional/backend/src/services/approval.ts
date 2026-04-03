@@ -1,11 +1,12 @@
 import { eq, and, desc } from 'drizzle-orm';
-import { approvals, filings, users } from '@filing/database';
+import { approvals, filings } from '@filing/database';
 import type { ApprovalAction, ApprovalGroupName } from '@filing/shared';
 import { db } from '../lib/db.js';
 import { generateId } from '../lib/id.js';
 import { getOrgProvider, getNotifyProvider } from '../providers/index.js';
 import * as auditService from './audit.js';
 import { sendCompletionEmail, sendCompletionEmailWithOverrides } from './email.js';
+import { getEmployeeByCode, getEmployeesByCode } from './org-query.js';
 
 export interface EmailOptions {
   skipEmail?: boolean;
@@ -14,20 +15,20 @@ export interface EmailOptions {
 
 // ─── 查询 ────────────────────────────────────────────
 
-/** 获取待审批列表（admin 可见所有 pending 审批，用于改派） */
+/** 获取待审批列表 */
 export async function getApprovalTodos(approverId: string, isAdmin = false) {
   const conditions = isAdmin
     ? eq(approvals.status, 'pending')
     : and(eq(approvals.approverId, approverId), eq(approvals.status, 'pending'));
 
-  return db
+  const rows = await db
     .select({
       approvalId: approvals.id,
       filingId: approvals.filingId,
       filingNumber: filings.filingNumber,
       filingTitle: filings.title,
       filingType: filings.type,
-      creatorName: users.name,
+      creatorId: filings.creatorId,
       domain: filings.domain,
       amount: filings.amount,
       stage: approvals.stage,
@@ -38,9 +39,17 @@ export async function getApprovalTodos(approverId: string, isAdmin = false) {
     })
     .from(approvals)
     .innerJoin(filings, eq(approvals.filingId, filings.id))
-    .innerJoin(users, eq(filings.creatorId, users.id))
     .where(conditions)
     .orderBy(desc(filings.submittedAt));
+
+  // 批量查创建人姓名
+  const creatorCodes = [...new Set(rows.map(r => r.creatorId).filter(Boolean))];
+  const empMap = creatorCodes.length > 0 ? await getEmployeesByCode(creatorCodes) : new Map();
+
+  return rows.map(r => ({
+    ...r,
+    creatorName: empMap.get(r.creatorId)?.name ?? r.creatorId,
+  }));
 }
 
 /** 获取某备案的审批历史 */
@@ -56,23 +65,6 @@ export async function getApprovalHistory(filingId: string) {
 
 /**
  * 处理审批操作（同意 / 驳回 / 知悉）
- *
- * 状态流转规则:
- *
- * [business 阶段]
- *   approve → 如果还有下一级业务审批人 → 创建下一级
- *           → 如果是最后一级 → 进入 group 阶段（或直接进入 confirmation）
- *   reject  → filing → rejected
- *   acknowledge → 视为通过，流转到下一级
- *
- * [group 阶段]
- *   approve / acknowledge → 检查同一 filing 所有 group 审批是否完成
- *                         → 全部完成 → 进入 confirmation
- *   reject → filing → rejected
- *
- * [confirmation 阶段]
- *   approve → filing → completed
- *   reject  → filing → rejected
  */
 export async function processApproval(
   approvalId: string,
@@ -82,7 +74,6 @@ export async function processApproval(
   approverName?: string,
   emailOptions?: EmailOptions,
 ) {
-  // 验证审批记录
   const existing = await db.select().from(approvals).where(eq(approvals.id, approvalId)).limit(1);
   if (existing.length === 0) throw new Error('审批记录不存在');
   if (existing[0].approverId !== approverId) throw new Error('无权处理此审批');
@@ -93,7 +84,6 @@ export async function processApproval(
   const notifyProvider = getNotifyProvider();
   const resolvedName = approverName ?? approval.approverName;
 
-  // 更新审批状态
   const statusMap: Record<ApprovalAction, string> = {
     approve: 'approved',
     reject: 'rejected',
@@ -106,7 +96,6 @@ export async function processApproval(
     decidedAt: now,
   }).where(eq(approvals.id, approvalId));
 
-  // 关闭外部待办
   if (approval.externalTodoId) {
     await notifyProvider.closeTodo(
       approval.externalTodoId,
@@ -114,13 +103,11 @@ export async function processApproval(
     );
   }
 
-  // 获取备案信息
   const filingRows = await db.select().from(filings).where(eq(filings.id, approval.filingId)).limit(1);
   const filing = filingRows[0];
 
-  // 驳回: 任何阶段驳回 → filing 回到草稿（发起人可修改后重新提交），审批记录保留
+  // 驳回
   if (action === 'reject') {
-    // 关闭同一 filing 的其他 pending 审批（如集团阶段并行审批）
     const otherPending = await db
       .select()
       .from(approvals)
@@ -152,7 +139,7 @@ export async function processApproval(
     return { status: 'rejected' as const, filingStatus: 'draft' as const };
   }
 
-  // 同意或知悉 → 根据阶段决定下一步
+  // 同意或知悉
   await auditService.logAudit({
     action: action === 'acknowledge' ? 'filing_acknowledged' : 'filing_approved',
     entityType: 'approval',
@@ -176,12 +163,6 @@ export async function processApproval(
 
 // ─── 阶段流转逻辑 ────────────────────────────────────
 
-/**
- * 业务侧审批通过后:
- *   还有下一级 → 创建下一级
- *   没有了 → 如果有集团审批组 → pending_group + 创建集团审批
- *          → 没有集团审批组 → pending_confirmation + 创建确认任务
- */
 async function handleBusinessApproved(
   filing: typeof filings.$inferSelect,
   approval: typeof approvals.$inferSelect,
@@ -190,23 +171,23 @@ async function handleBusinessApproved(
 ) {
   const notifyProvider = getNotifyProvider();
 
-  // 获取创建人信息
-  const creatorRows = await db.select().from(users).where(eq(users.id, filing.creatorId)).limit(1);
-  const creator = creatorRows[0];
+  // 从 org 表获取创建人信息
+  const creator = await getEmployeeByCode(filing.creatorId);
+  const creatorName = creator?.empName ?? filing.creatorId;
+  const creatorDepartment = creator?.xwName ?? creator?.ptName ?? '';
+  const creatorDomain = creator?.fieldName ?? '';
 
-  // 重新获取审批链判断是否有下一级
   const orgProvider = getOrgProvider();
   const chain = await orgProvider.getBusinessApproverChain({
     creatorId: filing.creatorId,
-    creatorDepartment: creator.department,
-    creatorDomain: creator.domain,
+    creatorDepartment,
+    creatorDomain,
     filingType: filing.type,
     amount: filing.amount,
   });
 
   if (approval.level < chain.length) {
-    // 还有下一级业务审批
-    const nextApprover = chain[approval.level]; // chain 0-indexed, level 1-indexed
+    const nextApprover = chain[approval.level];
     const nextApprovalId = generateId('approval');
 
     await db.insert(approvals).values({
@@ -228,7 +209,7 @@ async function handleBusinessApproved(
       approverName: nextApprover.name,
       stage: 'business',
       level: approval.level + 1,
-      creatorName: creator.name,
+      creatorName,
       amount: filing.amount,
       filingType: filing.type,
     });
@@ -240,22 +221,15 @@ async function handleBusinessApproved(
     return { status: 'approved' as const, filingStatus: 'pending_business' as const };
   }
 
-  // 业务侧全部通过 → 看是否有集团审批组
   const groups = (filing.approvalGroups ?? []) as ApprovalGroupName[];
 
   if (groups.length > 0) {
-    return enterGroupStage(filing, groups, creator.name, now);
+    return enterGroupStage(filing, groups, creatorName, now);
   }
 
-  // 没有集团审批组 → 直接进入确认阶段
-  return enterConfirmationStage(filing, creator.name, now);
+  return enterConfirmationStage(filing, creatorName, now);
 }
 
-/**
- * 进入集团审批组阶段:
- *   为每个勾选的审批组创建一条并行审批
- *   filing 状态 → pending_group
- */
 async function enterGroupStage(
   filing: typeof filings.$inferSelect,
   groups: readonly ApprovalGroupName[],
@@ -306,16 +280,10 @@ async function enterGroupStage(
   return { status: 'approved' as const, filingStatus: 'pending_group' as const };
 }
 
-/**
- * 集团审批组审批完成检查:
- *   所有 group 审批都非 pending → 进入确认阶段
- *   否则等待
- */
 async function handleGroupApproved(
   filing: typeof filings.$inferSelect,
   now: Date,
 ) {
-  // 查看该 filing 的所有 group 审批
   const groupApprovals = await db
     .select()
     .from(approvals)
@@ -324,23 +292,16 @@ async function handleGroupApproved(
   const allDone = groupApprovals.every(a => a.status !== 'pending');
 
   if (!allDone) {
-    // 还有 pending 的集团审批，等待
     return { status: 'approved' as const, filingStatus: 'pending_group' as const };
   }
 
-  // 获取创建人名称
-  const creatorRows = await db.select().from(users).where(eq(users.id, filing.creatorId)).limit(1);
-  const creatorName = creatorRows[0]?.name ?? '';
+  // 从 org 表获取创建人名称
+  const creator = await getEmployeeByCode(filing.creatorId);
+  const creatorName = creator?.empName ?? filing.creatorId;
 
-  // 所有集团审批完成 → 进入确认阶段
   return enterConfirmationStage(filing, creatorName, now);
 }
 
-/**
- * 进入最终确认阶段:
- *   创建确认任务
- *   filing 状态 → pending_confirmation
- */
 async function enterConfirmationStage(
   filing: typeof filings.$inferSelect,
   creatorName: string,
@@ -389,10 +350,6 @@ async function enterConfirmationStage(
   return { status: 'approved' as const, filingStatus: 'pending_confirmation' as const };
 }
 
-/**
- * 最终确认通过:
- *   filing → completed
- */
 async function handleConfirmationApproved(
   filing: typeof filings.$inferSelect,
   confirmerId: string,
@@ -406,7 +363,6 @@ async function handleConfirmationApproved(
     updatedAt: now,
   }).where(eq(filings.id, filing.id));
 
-  // 发送完结邮件通知（失败不影响备案完成）
   if (!emailOptions?.skipEmail) {
     try {
       if (emailOptions?.emailOverrides) {
@@ -439,30 +395,26 @@ export async function reassignApproval(
   const approval = existing[0];
   const notifyProvider = getNotifyProvider();
 
-  // 查新审批人
-  const newApproverRows = await db.select().from(users).where(eq(users.id, newApproverId)).limit(1);
-  if (newApproverRows.length === 0) throw new Error('新审批人不存在');
-  const newApprover = newApproverRows[0];
+  // 从 org 表查新审批人
+  const newApprover = await getEmployeeByCode(newApproverId);
+  if (!newApprover) throw new Error('新审批人不存在');
 
   const oldApproverId = approval.approverId;
   const oldApproverName = approval.approverName;
 
-  // 更新审批记录
   await db.update(approvals).set({
     approverId: newApproverId,
-    approverName: newApprover.name,
+    approverName: newApprover.empName,
     reassignedFrom: oldApproverId,
   }).where(eq(approvals.id, approvalId));
 
-  // 关闭旧待办 + 推送新待办
   if (approval.externalTodoId) {
     await notifyProvider.closeTodo(approval.externalTodoId, 'recalled');
   }
 
-  // 获取备案信息用于推送
   const filingRows = await db.select().from(filings).where(eq(filings.id, approval.filingId)).limit(1);
   const filing = filingRows[0];
-  const creatorRows = await db.select().from(users).where(eq(users.id, filing.creatorId)).limit(1);
+  const creator = await getEmployeeByCode(filing.creatorId);
 
   const externalTodoId = await notifyProvider.pushTodo({
     approvalId,
@@ -470,11 +422,11 @@ export async function reassignApproval(
     filingTitle: filing.title,
     filingNumber: filing.filingNumber,
     approverUserId: newApproverId,
-    approverName: newApprover.name,
+    approverName: newApprover.empName,
     stage: approval.stage,
     level: approval.level,
     groupName: approval.groupName ?? undefined,
-    creatorName: creatorRows[0]?.name ?? '',
+    creatorName: creator?.empName ?? filing.creatorId,
     amount: filing.amount,
     filingType: filing.type,
   });
@@ -489,10 +441,10 @@ export async function reassignApproval(
     entityId: approvalId,
     userId: adminUserId,
     userName: adminName,
-    detail: { from: oldApproverName, fromId: oldApproverId, to: newApprover.name, toId: newApproverId, reason },
+    detail: { from: oldApproverName, fromId: oldApproverId, to: newApprover.empName, toId: newApproverId, reason },
   });
 
-  return { success: true, newApprover: newApprover.name };
+  return { success: true, newApprover: newApprover.empName };
 }
 
 /** 批量审批 */

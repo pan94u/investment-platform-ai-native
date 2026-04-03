@@ -104,7 +104,7 @@ filingsRouter.post('/:id/submit', async (c) => {
   const user = c.get('user');
 
   try {
-    const filing = await filingService.submitFiling(c.req.param('id'), user.id, user.name);
+    const filing = await filingService.submitFiling(c.req.param('id'), user);
     return c.json({ success: true, data: filing, error: null });
   } catch (err) {
     const message = err instanceof Error ? err.message : '提交失败';

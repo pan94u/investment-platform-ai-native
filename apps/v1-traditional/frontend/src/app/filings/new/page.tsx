@@ -8,6 +8,7 @@ import type { UploadedFileRef } from '@/components/file-upload';
 import { RichTextEditor } from '@/components/rich-text-editor';
 import { ProjectAutocomplete } from '@/components/project-autocomplete';
 import { api, getCurrentUser } from '@/lib/api';
+import { RecipientPicker } from '@/components/recipient-picker';
 import {
   FILING_TYPE_LABELS, PROJECT_STAGE_LABELS, TYPE_ALLOWED_STAGES,
   APPROVAL_GROUP_LABELS, APPROVAL_GROUPS, STAGE_LABELS,
@@ -70,7 +71,6 @@ export default function NewFilingPage() {
   const [error, setError] = useState('');
   const [chainPreview, setChainPreview] = useState<ChainPreview | null>(null);
   const [chainLoading, setChainLoading] = useState(false);
-  const [allUsers, setAllUsers] = useState<Array<{ id: string; name: string; department: string }>>([]);
   const [domains, setDomains] = useState<Array<{ code: string; name: string }>>([]);
   const [industries, setIndustries] = useState<Array<{ code: string; name: string }>>([]);
 
@@ -78,7 +78,6 @@ export default function NewFilingPage() {
 
   // 加载系统用户列表 + 领域列表
   useEffect(() => {
-    api.getUsers().then((users) => setAllUsers(users.map(u => ({ id: u.id, name: u.name, department: u.department })))).catch(() => {});
     api.getOrgDomains().then(setDomains).catch(() => {});
   }, []);
 
@@ -368,34 +367,16 @@ export default function NewFilingPage() {
 
               {/* 备案邮件业务收件人 */}
               <Field label="备案邮件业务收件人">
-                <p className="mb-2 text-xs text-gray-400">备案完成后邮件发送给业务方的人员，默认为审批链上的人</p>
-                <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1.5 min-h-[40px]">
-                  {form.emailRecipients.map((uid) => {
-                    const u = allUsers.find(u => u.id === uid);
-                    return (
-                      <span key={uid} className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs text-blue-700">
-                        {u?.name ?? uid}
-                        <button type="button" onClick={() => update('emailRecipients', form.emailRecipients.filter(r => r !== uid))}
-                          className="ml-0.5 text-blue-400 hover:text-blue-700 leading-none">&times;</button>
-                      </span>
-                    );
-                  })}
-                  <select
-                    value=""
-                    onChange={(e) => {
-                      if (e.target.value && !form.emailRecipients.includes(e.target.value)) {
-                        update('emailRecipients', [...form.emailRecipients, e.target.value]);
-                      }
-                      e.target.value = '';
-                    }}
-                    className="flex-1 min-w-[120px] border-none bg-transparent text-sm text-gray-500 outline-none"
-                  >
-                    <option value="">追加收件人...</option>
-                    {allUsers.filter(u => !form.emailRecipients.includes(u.id)).map(u => (
-                      <option key={u.id} value={u.id}>{u.name} — {u.department}</option>
-                    ))}
-                  </select>
-                </div>
+                <p className="mb-2 text-xs text-gray-400">备案完成后邮件发送给业务方的人员，默认为审批链上的人，输入姓名或工号可追加</p>
+                <RecipientPicker
+                  value={form.emailRecipients}
+                  onChange={(ids) => update('emailRecipients', ids)}
+                  nameMap={chainPreview ? new Map(
+                    [...chainPreview.business.map(a => [a.userId, a.name] as const),
+                     ...chainPreview.group.map(g => [g.userId, g.name] as const),
+                     [chainPreview.confirmation.userId, chainPreview.confirmation.name] as const]
+                  ) : undefined}
+                />
               </Field>
             </div>
 

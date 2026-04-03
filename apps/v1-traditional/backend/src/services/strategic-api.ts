@@ -92,7 +92,7 @@ async function fetchPreInvestmentProjects(token: string): Promise<StrategicProje
     return list.map((item) => ({
       id: item.id ?? item.dealId ?? '',
       name: item.dealName ?? item.name ?? '',
-      code: item.dealCode ?? '',
+      code: item.dealCode ?? item.projectCode ?? item.id ?? '',
     }));
   } catch (e) {
     console.error('[Strategic] 投前请求失败:', url, e instanceof Error ? e.message : e);
@@ -112,7 +112,7 @@ async function fetchPostInvestmentProjects(token: string): Promise<StrategicProj
     return list.map((item) => ({
       id: item.id ?? '',
       name: item.dealName ?? item.name ?? '',
-      code: item.dealCode ?? '',
+      code: item.projectCode ?? item.dealCode ?? item.id ?? '',
     }));
   } catch (e) {
     console.error('[Strategic] 投后请求失败:', url, e instanceof Error ? e.message : e);
@@ -132,7 +132,7 @@ async function fetchExitProjects(token: string): Promise<StrategicProject[]> {
     return list.map((item) => ({
       id: item.id ?? '',
       name: item.dealName ?? item.name ?? '',
-      code: item.dealCode ?? '',
+      code: item.dealCode ?? item.projectCode ?? item.id ?? '',
     }));
   } catch (e) {
     console.error('[Strategic] 退出请求失败:', url, e instanceof Error ? e.message : e);

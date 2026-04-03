@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
 
 interface Recipient {
@@ -24,8 +24,14 @@ export function EmailPreviewModal({ filingId, approvalId, comment, onClose, onSu
   const [subject, setSubject] = useState('');
   const [htmlBody, setHtmlBody] = useState('');
   const [attachmentNames, setAttachmentNames] = useState<string[]>([]);
-  const [newTo, setNewTo] = useState('');
-  const [newCc, setNewCc] = useState('');
+  const [toQuery, setToQuery] = useState('');
+  const [ccQuery, setCcQuery] = useState('');
+  const [toResults, setToResults] = useState<Array<{ id: string; name: string; email: string; department: string }>>([]);
+  const [ccResults, setCcResults] = useState<Array<{ id: string; name: string; email: string; department: string }>>([]);
+  const [toOpen, setToOpen] = useState(false);
+  const [ccOpen, setCcOpen] = useState(false);
+  const toRef = useRef<HTMLDivElement>(null);
+  const ccRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     api.getEmailPreview(filingId).then((data) => {
@@ -43,19 +49,51 @@ export function EmailPreviewModal({ filingId, approvalId, comment, onClose, onSu
   function removeCc(email: string) {
     setCcList((prev) => prev.filter(r => r.email !== email));
   }
-  function addTo() {
-    const email = newTo.trim();
-    if (email && !toList.some(r => r.email === email)) {
-      setToList((prev) => [...prev, { email, name: email.split('@')[0] }]);
-      setNewTo('');
+  // 搜索收件人
+  useEffect(() => {
+    if (toQuery.length < 2) { setToResults([]); return; }
+    const t = setTimeout(async () => {
+      try {
+        const list = await api.searchUsers(toQuery);
+        setToResults(list.map(u => ({ id: u.id, name: u.name, email: (u as Record<string, unknown>).email as string ?? '', department: u.department })));
+      } catch { setToResults([]); }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [toQuery]);
+
+  // 搜索抄送人
+  useEffect(() => {
+    if (ccQuery.length < 2) { setCcResults([]); return; }
+    const t = setTimeout(async () => {
+      try {
+        const list = await api.searchUsers(ccQuery);
+        setCcResults(list.map(u => ({ id: u.id, name: u.name, email: (u as Record<string, unknown>).email as string ?? '', department: u.department })));
+      } catch { setCcResults([]); }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [ccQuery]);
+
+  // 点击外部关闭下拉
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (toRef.current && !toRef.current.contains(e.target as Node)) setToOpen(false);
+      if (ccRef.current && !ccRef.current.contains(e.target as Node)) setCcOpen(false);
     }
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, []);
+
+  function addTo(person: { name: string; email: string }) {
+    if (person.email && !toList.some(r => r.email === person.email)) {
+      setToList((prev) => [...prev, { email: person.email, name: person.name }]);
+    }
+    setToQuery(''); setToOpen(false);
   }
-  function addCc() {
-    const email = newCc.trim();
-    if (email && !ccList.some(r => r.email === email)) {
-      setCcList((prev) => [...prev, { email, name: email.split('@')[0] }]);
-      setNewCc('');
+  function addCc(person: { name: string; email: string }) {
+    if (person.email && !ccList.some(r => r.email === person.email)) {
+      setCcList((prev) => [...prev, { email: person.email, name: person.name }]);
     }
+    setCcQuery(''); setCcOpen(false);
   }
 
   async function handleConfirmAndSend() {
@@ -107,37 +145,43 @@ export function EmailPreviewModal({ filingId, approvalId, comment, onClose, onSu
         ) : (
           <div className="px-6 py-5 space-y-5">
             {/* 收件人 */}
-            <div>
+            <div ref={toRef} className="relative">
               <label className="mb-1.5 block text-sm font-medium text-gray-600">收件人</label>
               <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1.5 min-h-[40px]">
                 {toList.map((r) => (
                   <Pill key={r.email} label={`${r.name} <${r.email}>`} onRemove={() => removeTo(r.email)} />
                 ))}
                 <input
-                  value={newTo}
-                  onChange={(e) => setNewTo(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTo(); } }}
-                  placeholder="输入邮箱回车添加"
+                  value={toQuery}
+                  onChange={(e) => { setToQuery(e.target.value); setToOpen(true); }}
+                  onFocus={() => { if (toQuery.length >= 2) setToOpen(true); }}
+                  placeholder="输入姓名或工号搜索..."
                   className="flex-1 min-w-[140px] border-none bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-300"
                 />
               </div>
+              {toOpen && toQuery.length >= 2 && (
+                <SearchDropdown results={toResults} onSelect={addTo} />
+              )}
             </div>
 
             {/* 抄送 */}
-            <div>
+            <div ref={ccRef} className="relative">
               <label className="mb-1.5 block text-sm font-medium text-gray-600">抄送</label>
               <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1.5 min-h-[40px]">
                 {ccList.map((r) => (
                   <Pill key={r.email} label={`${r.name} <${r.email}>`} onRemove={() => removeCc(r.email)} />
                 ))}
                 <input
-                  value={newCc}
-                  onChange={(e) => setNewCc(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCc(); } }}
-                  placeholder="输入邮箱回车添加"
+                  value={ccQuery}
+                  onChange={(e) => { setCcQuery(e.target.value); setCcOpen(true); }}
+                  onFocus={() => { if (ccQuery.length >= 2) setCcOpen(true); }}
+                  placeholder="输入姓名或工号搜索..."
                   className="flex-1 min-w-[140px] border-none bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-300"
                 />
               </div>
+              {ccOpen && ccQuery.length >= 2 && (
+                <SearchDropdown results={ccResults} onSelect={addCc} />
+              )}
             </div>
 
             {/* 主题 */}
@@ -201,6 +245,30 @@ export function EmailPreviewModal({ filingId, approvalId, comment, onClose, onSu
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SearchDropdown({ results, onSelect }: {
+  results: Array<{ id: string; name: string; email: string; department: string }>;
+  onSelect: (person: { name: string; email: string }) => void;
+}) {
+  if (results.length === 0) {
+    return (
+      <div className="absolute z-30 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg px-3 py-2 text-sm text-gray-400">
+        未找到匹配人员
+      </div>
+    );
+  }
+  return (
+    <div className="absolute z-30 mt-1 w-full max-h-40 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+      {results.map((r) => (
+        <button key={r.id} type="button" onClick={() => onSelect(r)}
+          className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-blue-50">
+          <span className="text-gray-700">{r.name}</span>
+          <span className="ml-2 text-xs text-gray-400">{r.email || r.department}</span>
+        </button>
+      ))}
     </div>
   );
 }

@@ -32,7 +32,6 @@ auth.get('/users', async (c) => {
   const keyword = c.req.query('keyword') ?? '';
 
   if (keyword.length >= 2) {
-    // 搜索模式
     const emps = await searchEmployees(keyword, 30);
     const result = emps.map(e => ({
       id: e.empCode,
@@ -40,19 +39,13 @@ auth.get('/users', async (c) => {
       name: e.empName,
       department: e.xwName || e.ptName,
       domain: e.fieldName,
+      email: e.entEmail,
     }));
     return c.json({ success: true, data: result, error: null });
   }
 
-  // 无关键词：返回开发环境 PoC 用户列表（兼容）
-  const pocUsers = [
-    { id: 'user-zhangsan', empCode: 'user-zhangsan', name: '张三', role: 'initiator', department: '智慧住居事业部', domain: '智慧住居' },
-    { id: 'user-lisi', empCode: 'user-lisi', name: '李四', role: 'supervisor', department: '智慧住居事业部', domain: '智慧住居' },
-    { id: 'user-wangwu', empCode: 'user-wangwu', name: '王五', role: 'group_approver', department: '集团战略投资部', domain: '集团战略' },
-    { id: 'user-admin', empCode: 'user-admin', name: '曹智', role: 'admin', department: '集团战略投资部', domain: '集团战略' },
-    { id: 'user-ceo', empCode: 'user-ceo', name: '陈总', role: 'viewer', department: '集团管理层', domain: '集团管理' },
-  ];
-  return c.json({ success: true, data: pocUsers, error: null });
+  // 无关键词：返回空列表（前端通过搜索添加收件人）
+  return c.json({ success: true, data: [], error: null });
 });
 
 /** POST /api/auth/login — PoC 兼容登录接口 */

@@ -1,8 +1,9 @@
 import { eq } from 'drizzle-orm';
-import { attachments, filings, users } from '@filing/database';
+import { attachments, filings } from '@filing/database';
 import { db } from '../lib/db.js';
 import { generateId } from '../lib/id.js';
 import * as auditService from './audit.js';
+import { getEmployeesByCode } from './org-query.js';
 
 /**
  * 投资知识平台(KWG)文档上传
@@ -88,13 +89,13 @@ async function uploadToRemote(file: File, iamToken: string): Promise<{ fileUrl: 
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`文档上传服务返回 ${res.status}: ${text}`);
+      throw new Error(`文档上传服务返回 ${res.status}: ${text.slice(0, 100)}`);
     }
 
     const json = await res.json() as Record<string, unknown>;
 
     // 兼容多种返回格式
-    const data = (json.data ?? json.result ?? json) as Record<string, unknown>;
+    const data = (json.data ?? json.datas ?? json.result ?? json) as Record<string, unknown>;
     const fileUrl = (data.url ?? data.fileUrl ?? data.filePath ?? data.path ?? '') as string;
     const fileId = (data.id ?? data.fileId ?? data.documentId ?? '') as string;
 
@@ -226,7 +227,7 @@ export async function registerAttachment(
 
 /** 查询附件列表 */
 export async function getAttachments(filingId: string) {
-  return db
+  const rows = await db
     .select({
       id: attachments.id,
       filingId: attachments.filingId,
@@ -235,12 +236,19 @@ export async function getAttachments(filingId: string) {
       fileSize: attachments.fileSize,
       mimeType: attachments.mimeType,
       uploadedBy: attachments.uploadedBy,
-      uploaderName: users.name,
       createdAt: attachments.createdAt,
     })
     .from(attachments)
-    .leftJoin(users, eq(attachments.uploadedBy, users.id))
     .where(eq(attachments.filingId, filingId));
+
+  // 从 org 表批量查上传人姓名
+  const empCodes = [...new Set(rows.map(r => r.uploadedBy).filter(Boolean))];
+  const empMap = empCodes.length > 0 ? await getEmployeesByCode(empCodes) : new Map();
+
+  return rows.map(r => ({
+    ...r,
+    uploaderName: empMap.get(r.uploadedBy)?.name ?? r.uploadedBy,
+  }));
 }
 
 /** 获取单个附件（含文件路径） */

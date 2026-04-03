@@ -540,10 +540,60 @@ docker compose -f infrastructure/docker/docker-compose.v1.yml up -d
 | BUG-007 | 项目名称联想无候选项 | ✅ 已修复（响应格式+method+认证） |
 | BUG-008 | 文件上传报错（KWG getTokenByIam 401） | ⏳ 等系统方确认 |
 
+#### Bug 批量修复（emp_code 迁移 + 体验优化）
+
+**核心问题**：系统从 PoC `users` 表迁移到 emp_code 后，9 处代码仍引用旧表导致运行时报错。
+
+| 文件 | 修复内容 |
+|------|---------|
+| `filing.ts` | `submitFiling` + `getFilingById` 改用 auth context / org 表 |
+| `approval.ts` | 4 处 `users` 查询全部改为 `getEmployeeByCode` |
+| `email.ts` | 邮件预览收件人/创建人改为批量查 org 表 |
+| `attachment.ts` | `getAttachments` uploaderName 改查 org 表 |
+| `org-query.ts` | 新增 AES-128-ECB 邮箱解密（密钥 `A850103003014ECB`），`searchEmployees` 修复 LIMIT 参数类型 |
+| `auth.ts` 路由 | 搜索 API 返回 email 字段，移除 PoC 用户列表 |
+
+**体验优化**：
+
+| 改动 | 说明 |
+|------|------|
+| `RecipientPicker` 组件 | 新建备案/编辑页追加收件人改为搜索选人（替代 PoC 固定下拉） |
+| `PersonSearch` 组件 | 管理后台审批节点配置 + 邮件抄送名单改为搜索选人 |
+| 邮件预览 Modal | 收件人/抄送追加改为搜索选人（替代手动输入邮箱） |
+| 详情页审批链路 | 展示完整链路（发起人→业务→集团→确认→完成），未到达步骤灰色显示 |
+| 详情页收件人显示 | 从 org 表解析姓名，不再显示工号 |
+
+#### E2E 测试进度
+
+| 用例 | 状态 |
+|------|------|
+| TC-2.1 新建备案入口 | ✅ |
+| TC-2.2 表单填写（项目联想、领域行业、审批组） | ✅ |
+| TC-2.3 保存草稿 | ✅ |
+| TC-2.4 草稿详情查看 | ✅ |
+| TC-2.5 提交审批 | ✅ |
+| TC-3.1 审批操作（确认+邮件预览） | 进行中 |
+
+#### Bug 清单最终状态
+
+| # | 描述 | 状态 |
+|---|------|------|
+| BUG-001 | IAM 字段映射 | ✅ |
+| BUG-002 | 邮件收件人只显示工号 | ✅ |
+| BUG-003/010 | 追加收件人 PoC 固定列表 | ✅ |
+| BUG-004 | FK 约束阻止 INSERT | ✅ |
+| BUG-005 | 上传架构改后端代理 | ✅ |
+| BUG-006 | getAttachments uploaderName null | ✅ |
+| BUG-007 | 项目联想无数据 | ✅ |
+| BUG-008 | KWG 上传认证 401 | ⏳ 等系统方 |
+| BUG-009 | 项目编号未带出 | ✅ 部分（投后有 projectCode，投前/退出用 id fallback） |
+| BUG-011 | submitFiling 查 users 表失败 | ✅ |
+
 #### 统计快照
-- 文件变更：~15 个文件
+- 文件变更：~25 个文件
 - 战投项目数据：投前 674 + 投后 101 + 退出 18 = 793
-- E2E 进度：TC-2.1 ✅ TC-2.2 部分通过（项目联想 ✅ 上传 ⏳）
+- E2E 进度：TC-2.1~2.5 ✅，TC-3.1 进行中
+- Bug：11 个记录，9 个已修复，1 个等系统方，1 个部分修复
 
 <!-- 模板：复制以下内容用于新一天的记录
 

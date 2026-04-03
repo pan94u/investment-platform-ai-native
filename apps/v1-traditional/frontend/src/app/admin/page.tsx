@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Nav } from '@/components/nav';
+import { PersonSearch } from '@/components/person-search';
+import type { PersonInfo } from '@/components/person-search';
 import { api, getCurrentUser } from '@/lib/api';
 import { APPROVAL_GROUP_LABELS } from '@/lib/constants';
 
@@ -52,7 +54,6 @@ function ApprovalConfigTab() {
   const [configs, setConfigs] = useState<Record<string, Array<Record<string, unknown>>>>({});
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState<string | null>(null);
-  const [form, setForm] = useState({ userName: '', userEmail: '' });
 
   const load = useCallback(async () => {
     try {
@@ -64,12 +65,10 @@ function ApprovalConfigTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function handleAdd(groupName: string) {
-    if (!form.userName || !form.userEmail) return;
+  async function handleAdd(groupName: string, person: PersonInfo) {
     try {
-      await api.addApprovalConfig({ groupName, userId: '', userName: form.userName, userEmail: form.userEmail });
+      await api.addApprovalConfig({ groupName, userId: person.empCode, userName: person.name, userEmail: person.email });
       setAdding(null);
-      setForm({ userName: '', userEmail: '' });
       await load();
     } catch (e) {
       alert(e instanceof Error ? e.message : '添加失败');
@@ -97,7 +96,7 @@ function ApprovalConfigTab() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-700">{GROUP_LABELS[group]}</h3>
               <button
-                onClick={() => { setAdding(adding === group ? null : group); setForm({ userName: '', userEmail: '' }); }}
+                onClick={() => { setAdding(adding === group ? null : group); }}
                 className="text-xs text-[#0066CC] hover:underline"
               >
                 {adding === group ? '取消' : '+ 添加'}
@@ -119,23 +118,12 @@ function ApprovalConfigTab() {
             ))}
 
             {adding === group && (
-              <div className="flex items-end gap-2 mt-2 pt-2 border-t border-gray-100">
-                <div className="flex-1">
-                  <label className="text-xs text-gray-400">姓名</label>
-                  <input value={form.userName} onChange={(e) => setForm(p => ({ ...p, userName: e.target.value }))}
-                    className="form-input mt-0.5" placeholder="审批人姓名" />
-                </div>
-                <div className="flex-1">
-                  <label className="text-xs text-gray-400">邮箱</label>
-                  <input value={form.userEmail} onChange={(e) => setForm(p => ({ ...p, userEmail: e.target.value }))}
-                    className="form-input mt-0.5" placeholder="邮箱地址" />
-                </div>
-                <button
-                  onClick={() => handleAdd(group)}
-                  className="rounded-md bg-[#0066CC] px-3 py-2 text-sm text-white hover:bg-[#0055AA]"
-                >
-                  确认
-                </button>
+              <div className="mt-2 pt-2 border-t border-gray-100">
+                <label className="text-xs text-gray-400 mb-1 block">搜索并选择审批人</label>
+                <PersonSearch
+                  placeholder="输入姓名或工号搜索..."
+                  onSelect={(person) => handleAdd(group, person)}
+                />
               </div>
             )}
           </div>
@@ -151,7 +139,6 @@ function EmailCcConfigTab() {
   const [configs, setConfigs] = useState<Record<string, Array<Record<string, unknown>>>>({});
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', email: '' });
 
   const load = useCallback(async () => {
     try {
@@ -163,12 +150,10 @@ function EmailCcConfigTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function handleAdd(groupName: string) {
-    if (!form.name || !form.email) return;
+  async function handleAdd(groupName: string, person: PersonInfo) {
     try {
-      await api.addEmailCcConfig({ groupName, name: form.name, email: form.email });
+      await api.addEmailCcConfig({ groupName, name: person.name, email: person.email });
       setAdding(null);
-      setForm({ name: '', email: '' });
       await load();
     } catch (e) {
       alert(e instanceof Error ? e.message : '添加失败');
@@ -196,7 +181,7 @@ function EmailCcConfigTab() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-700">{GROUP_LABELS[group]}</h3>
               <button
-                onClick={() => { setAdding(adding === group ? null : group); setForm({ name: '', email: '' }); }}
+                onClick={() => { setAdding(adding === group ? null : group); }}
                 className="text-xs text-[#0066CC] hover:underline"
               >
                 {adding === group ? '取消' : '+ 添加'}
@@ -218,23 +203,12 @@ function EmailCcConfigTab() {
             ))}
 
             {adding === group && (
-              <div className="flex items-end gap-2 mt-2 pt-2 border-t border-gray-100">
-                <div className="flex-1">
-                  <label className="text-xs text-gray-400">姓名</label>
-                  <input value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))}
-                    className="form-input mt-0.5" placeholder="抄送人姓名" />
-                </div>
-                <div className="flex-1">
-                  <label className="text-xs text-gray-400">邮箱</label>
-                  <input value={form.email} onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))}
-                    className="form-input mt-0.5" placeholder="邮箱地址" />
-                </div>
-                <button
-                  onClick={() => handleAdd(group)}
-                  className="rounded-md bg-[#0066CC] px-3 py-2 text-sm text-white hover:bg-[#0055AA]"
-                >
-                  确认
-                </button>
+              <div className="mt-2 pt-2 border-t border-gray-100">
+                <label className="text-xs text-gray-400 mb-1 block">搜索并选择抄送人</label>
+                <PersonSearch
+                  placeholder="输入姓名或工号搜索..."
+                  onSelect={(person) => handleAdd(group, person)}
+                />
               </div>
             )}
           </div>

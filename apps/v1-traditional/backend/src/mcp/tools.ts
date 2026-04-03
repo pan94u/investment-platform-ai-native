@@ -67,7 +67,7 @@ const filingSubmit: ToolFn = async (args, userId, userName) => {
   if (boundary.requiresHuman && !args._humanConfirmed) {
     return textResponse({ requiresHumanConfirmation: true, reason: boundary.reason, message: '请确认后传入 _humanConfirmed: true' });
   }
-  const filing = await filingService.submitFiling(filingId, userId, userName);
+  const filing = await filingService.submitFiling(filingId, { id: userId, name: userName, department: '', domain: '' });
   return textResponse({ message: '备案已提交审批', filing });
 };
 
