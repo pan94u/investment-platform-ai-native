@@ -1,4 +1,5 @@
 import type { NotifyProvider, TodoPayload } from './types.js';
+import { getEmployeeByCode } from '../services/org-query.js';
 
 const FEISHU_BASE = 'https://open.feishu.cn/open-apis';
 
@@ -80,25 +81,51 @@ export class FeishuNotifyProvider implements NotifyProvider {
 
   // ─── emp_code → open_id 解析（带缓存）────────────────
 
-  /** 通过工号查询飞书 open_id，缓存到内存避免重复调用 */
+  /**
+   * 通过工号查询飞书 open_id，缓存到内存避免重复调用
+   *
+   * 流程：emp_code → org 表查 entEmail → 飞书 batch_get_id(emails=[email]) → open_id
+   *
+   * 注意 — 飞书 `batch_get_id` 只支持 `emails` 和 `mobiles`，**不支持** `employee_ids` 参数
+   * （已验证 4 月 8 日：即使传 `employee_ids: [...]`，飞书会静默忽略，user_list 返回空数组）。
+   * 所以必须从 org 表拿到邮箱再查飞书。
+   *
+   * 需要的飞书权限 scope：`contact:user.id:readonly`
+   */
   private async getOpenIdByEmpCode(empCode: string): Promise<string | null> {
     if (this.openIdCache.has(empCode)) {
       return this.openIdCache.get(empCode) ?? null;
     }
     try {
+      const emp = await getEmployeeByCode(empCode);
+      const email = emp?.entEmail?.trim();
+      if (!email) {
+        console.warn(`[Feishu] empCode=${empCode} 在 org 表中无邮箱，跳过飞书推送`);
+        return null;
+      }
+
       const data = await this.request(
         'POST',
         '/contact/v3/users/batch_get_id?user_id_type=open_id',
-        { emails: [], mobiles: [], employee_ids: [empCode] },
+        { emails: [email], mobiles: [] },
       );
-      // 响应结构: { data: { user_list: [{ employee_id, user_id, mobile, email }] } }
+
+      const code = data.code as number | undefined;
+      if (code !== 0 && code !== undefined) {
+        console.error(`[Feishu] batch_get_id 权限/业务错误 code=${code} msg=${data.msg}`);
+        return null;
+      }
+
       const userList = ((data.data as Record<string, unknown>)?.user_list as Array<Record<string, unknown>>) ?? [];
-      const match = userList.find((u) => u.employee_id === empCode);
+      const targetEmail = email.toLowerCase();
+      const match = userList.find((u) => (u.email as string | undefined)?.toLowerCase() === targetEmail);
       const openId = (match?.user_id as string) ?? null;
+
       if (openId) {
         this.openIdCache.set(empCode, openId);
+        console.log(`[Feishu] empCode=${empCode} → email=${email} → open_id=${openId}`);
       } else {
-        console.warn(`[Feishu] empCode=${empCode} 未找到 open_id, 响应:`, JSON.stringify(data).slice(0, 300));
+        console.warn(`[Feishu] empCode=${empCode} email=${email} 飞书通讯录无对应用户`);
       }
       return openId;
     } catch (err) {
@@ -185,6 +212,72 @@ export class FeishuNotifyProvider implements NotifyProvider {
 
   // ─── NotifyProvider 实现 ─────────────────────────────
 
+  /** 通过手机号查飞书 open_id（batch_get_id mobiles）
+   *
+   * 需要权限 scope: contact:user.id:readonly
+   * 区分两种失败:
+   *   - 权限不足 (code 99991672) → 抛错（可被上层识别为配置问题）
+   *   - 用户不存在 (code 0 但 user_list 无 user_id) → 返回 null
+   */
+  async getOpenIdByMobile(mobile: string): Promise<string | null> {
+    const data = await this.request(
+      'POST',
+      '/contact/v3/users/batch_get_id?user_id_type=open_id',
+      { emails: [], mobiles: [mobile] },
+    );
+    const code = data.code as number | undefined;
+    if (code !== 0 && code !== undefined) {
+      const msg = (data.msg as string) ?? 'unknown';
+      console.error(`[Feishu] getOpenIdByMobile 权限/业务错误 code=${code} msg=${msg}`);
+      throw new Error(`飞书 API 错误 code=${code}: ${msg}`);
+    }
+    const userList = ((data.data as Record<string, unknown>)?.user_list as Array<Record<string, unknown>>) ?? [];
+    const match = userList.find((u) => (u.mobile as string) === mobile);
+    const openId = (match?.user_id as string) ?? null;
+    if (openId) {
+      console.log(`[Feishu] mobile=${mobile} → open_id=${openId}`);
+    } else {
+      console.warn(`[Feishu] mobile=${mobile} 飞书通讯录无对应用户`);
+    }
+    return openId;
+  }
+
+  /** 内部：把卡片发送到指定 open_id，返回 message_id
+   *
+   * 抽出来让 pushTodo（走工号解析）和 pushTodoToOpenId（测试直传）共用
+   */
+  private async sendCardToOpenId(openId: string, payload: TodoPayload): Promise<string | null> {
+    const card = this.buildApprovalCard(payload, 'pending');
+    const data = await this.request('POST', '/im/v1/messages?receive_id_type=open_id', {
+      receive_id: openId,
+      msg_type: 'interactive',
+      content: JSON.stringify(card),
+    });
+    const code = data.code as number | undefined;
+    if (code !== 0 && code !== undefined) {
+      console.error(`[Feishu] sendCard 业务失败 code=${code} msg=${data.msg}`);
+      return null;
+    }
+    const messageId = ((data.data as Record<string, unknown>)?.message_id as string) ?? null;
+    return messageId;
+  }
+
+  /** 直接用 open_id 发送卡片（测试路径，跳过工号/邮箱解析）*/
+  async pushTodoToOpenId(openId: string, payload: TodoPayload): Promise<string | null> {
+    try {
+      if (this.dryRun) {
+        console.log(`[Feishu DRY_RUN] pushTodoToOpenId ${openId}`);
+        return `dry-run-${payload.approvalId}`;
+      }
+      const messageId = await this.sendCardToOpenId(openId, payload);
+      console.log(`[Feishu] pushTodoToOpenId OK → ${openId} message_id=${messageId}`);
+      return messageId;
+    } catch (err) {
+      console.error('[Feishu] pushTodoToOpenId failed:', err);
+      return null;
+    }
+  }
+
   async pushTodo(payload: TodoPayload): Promise<string | null> {
     try {
       // dry_run 模式：只 console.log，不真发
@@ -203,21 +296,7 @@ export class FeishuNotifyProvider implements NotifyProvider {
         return null;
       }
 
-      const card = this.buildApprovalCard(payload, 'pending');
-
-      const data = await this.request('POST', '/im/v1/messages?receive_id_type=open_id', {
-        receive_id: openId,
-        msg_type: 'interactive',
-        content: JSON.stringify(card),
-      });
-
-      const code = data.code as number | undefined;
-      if (code !== 0 && code !== undefined) {
-        console.error(`[Feishu] pushTodo 业务失败 code=${code} msg=${data.msg}`);
-        return null;
-      }
-
-      const messageId = ((data.data as Record<string, unknown>)?.message_id as string) ?? null;
+      const messageId = await this.sendCardToOpenId(openId, payload);
       console.log(`[Feishu] pushTodo OK → empCode=${payload.approverUserId} message_id=${messageId}`);
       return messageId;
     } catch (err) {
