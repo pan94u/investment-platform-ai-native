@@ -56,6 +56,20 @@
 - 测试/生产环境地址可能完全不同主机（`10.138.68.2:30302` vs `hsip.haier.net`），不能假设同域名
 - 统一走后端代理，前端不直接调外部系统（避免 CORS + 认证复杂度）
 
+### Node fetch (undici) 调用海尔内网服务必须加 Connection: close（已验证 4 轮诊断）
+
+**症状**：项目列表 GET/POST 都正常，但 multipart 上传 30s 准时 abort，curl 同样的请求 1 秒成功。
+
+**根因**：undici 有全局连接池，对同一 host 复用 keep-alive 连接。海尔内网 nginx 的 keep-alive timeout 短，
+之前 GET 请求留下的连接被服务端单方面关闭，undici 没察觉（TCP RST 在 NAT 后丢失），下一次请求复用这个
+死 socket → 写得出去读不到响应 → hang 到 client AbortController 触发。
+
+**修复**：所有调用海尔内网服务的 fetch **都加 `Connection: close` 头**。代价是每次新建 TCP，但海尔内网
+延迟低可以接受。也避免了花式诊断 chunked encoding / Expect: 100-continue 等假根因。
+
+**走过的弯路**：以为是 chunked encoding → 手动构造 Buffer + Content-Length 没用；以为是 Expect 头；
+以为要换 node:http 模块。最终发现就是连接池死连接，一行 header 解决。
+
 ### IAM 字段映射（已验证）
 
 - `userName` = 工号（emp_code），不是用户名

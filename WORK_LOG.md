@@ -563,16 +563,29 @@ docker compose -f infrastructure/docker/docker-compose.v1.yml up -d
 | 详情页审批链路 | 展示完整链路（发起人→业务→集团→确认→完成），未到达步骤灰色显示 |
 | 详情页收件人显示 | 从 org 表解析姓名，不再显示工号 |
 
-#### E2E 测试进度
+#### E2E 测试进度（V1 传统版本完整走查）
 
-| 用例 | 状态 |
-|------|------|
-| TC-2.1 新建备案入口 | ✅ |
-| TC-2.2 表单填写（项目联想、领域行业、审批组） | ✅ |
-| TC-2.3 保存草稿 | ✅ |
-| TC-2.4 草稿详情查看 | ✅ |
-| TC-2.5 提交审批 | ✅ |
-| TC-3.1 审批操作（确认+邮件预览） | 进行中 |
+| 模块 | 用例 | 状态 | 备注 |
+|------|------|------|------|
+| **备案创建** | TC-2.1 新建备案入口 | ✅ | |
+| | TC-2.2 表单填写（项目联想、领域行业、审批组） | ✅ | 战投 793 项目联想可用 |
+| | TC-2.3 保存草稿 | ✅ | |
+| | TC-2.4 草稿详情查看 | ✅ | |
+| | TC-2.5 提交审批 | ✅ | |
+| **审批流程** | TC-3.1 确认审批+邮件预览 | ✅ | 收件人姓名/邮箱正确解析 |
+| | TC-3.2 确认完成（仅确认不发） | ✅ | 状态正确流转到 completed |
+| **备案管理** | TC-4.1 备案列表 | ✅ | 状态展示正确 |
+| | TC-4.2 撤回功能 | ✅ | recall 接口 200 |
+| | TC-4.3 编辑草稿 | ✅ | |
+| | TC-4.4 重新提交 | ✅ | |
+| **待办审批** | TC-5.1 审批待办列表 | ✅ | /todos 路由 404 → 走「审批待办」入口 |
+| | TC-5.2 多级审批操作 | ⏭️ 跳过 | 单账户无法验证多账户审批流转 |
+| **管理后台** | TC-6.1 管理后台入口 | ✅ | |
+| | TC-6.2 审批节点配置 | ✅ | BUG-013 重复加人 |
+| | TC-6.3 邮件抄送配置 | ✅ | BUG-014 重复加人 |
+| **附件上传** | TC-7.1 KWG 附件上传 | ❌ | BUG-008 等系统方解决 401 |
+| **AI MCP** | TC-8.x | ⏭️ 跳过 | 用户决定先不做 |
+| **仪表盘** | TC-9.1 仪表盘统计 | ✅ | |
 
 #### Bug 清单最终状态
 
@@ -588,12 +601,90 @@ docker compose -f infrastructure/docker/docker-compose.v1.yml up -d
 | BUG-008 | KWG 上传认证 401 | ⏳ 等系统方 |
 | BUG-009 | 项目编号未带出 | ✅ 部分（投后有 projectCode，投前/退出用 id fallback） |
 | BUG-011 | submitFiling 查 users 表失败 | ✅ |
+| BUG-012 | /todos 路由 404，待办列表页面不存在 | ⏳ 待修复 |
+| BUG-013 | 审批节点配置允许重复添加同一个人 | ⏳ 待修复 |
+| BUG-014 | 邮件抄送配置允许重复添加同一个人（同 BUG-013 同源） | ⏳ 待修复 |
 
 #### 统计快照
 - 文件变更：~25 个文件
 - 战投项目数据：投前 674 + 投后 101 + 退出 18 = 793
-- E2E 进度：TC-2.1~2.5 ✅，TC-3.1 进行中
-- Bug：11 个记录，9 个已修复，1 个等系统方，1 个部分修复
+- E2E 通过率：14/17 ✅（82%），3 跳过/失败（TC-5.2 多账户跳过、TC-7.1 等系统方、TC-8.x 跳过）
+- Bug：14 个记录
+  - ✅ 已修复：9 个（BUG-001~007、011，部分 009）
+  - ⏳ 待修复：3 个（BUG-012/013/014，下一 Session 集中修）
+  - ⏳ 等系统方：1 个（BUG-008 KWG 401）
+  - ⏳ 部分修复：1 个（BUG-009 项目编号 fallback）
+
+#### 下一步
+1. 集中修 BUG-012（/todos 路由）+ BUG-013/014（重复加人去重）
+2. 等海尔系统方反馈 BUG-008 KWG 上传认证
+3. V1 传统版本验收完成，转 V2 AI 原生版本开发
+
+---
+
+## 2026-04-08
+
+### BUG-008 修复 — 上传/下载改用战投 fileBase 接口（含 undici 死连接根因诊断）
+
+#### 背景
+上一 Session 的 BUG-008 卡在 KWG `getTokenByIam` 401，原本计划等海尔系统方反馈。
+战投系统后端给了 `/file/fileBase/uploadVant` 接口的 Java 参考代码，本质是同一套
+战投 token 体系（`checkUser` 已跑通）+ 不同的文件接口。决定不等 KWG，直接换战投上传。
+
+#### 实施
+
+**第一阶段：上传接口替换**
+- 抽出 `services/strategic-auth.ts` 共享 token 模块（`getStrategicToken` + `getStrategicApiBase`），
+  让 strategic-api 和 attachment 共用同一份 token 缓存
+- `services/attachment.ts:uploadToRemote` 改走 `${STRATEGIC_API_BASE}/file/fileBase/uploadVant`
+  - FormData 字段：`dataType=investmentFiling` + `files=<file>`（注意是复数 `files`）
+  - 解析 AjaxResult `{ code:200, data: [{ fileName, fileId }] }`
+- 删除 KWG 相关代码 + env 变量
+
+**第二阶段：fetch 30s 准时 abort 的连环诊断（4 轮，最终一行 header 修复）**
+
+| 轮次 | 假说 | 验证 | 结果 |
+|---|---|---|---|
+| 1 | 服务端响应慢 / dataType 不对 | 直接 curl 假 token → 1s 返回 401 | ❌ 服务端 1s 就响应 |
+| 2 | shell 代理污染（http_proxy=127.0.0.1:1087）| unset 所有 proxy 变量重启 backend | ❌ 仍 30s abort |
+| 3 | undici FormData 用 chunked encoding，Spring 不接受 | 手动构造 multipart Buffer + 显式 Content-Length | ❌ 仍 30s abort |
+| 4 | undici 连接池复用死 keep-alive 连接 | 加 `Connection: close` 头 | ✅ 1s 内成功 |
+
+**根因（已验证）**：undici 全局连接池对同一 host 复用 keep-alive 连接。海尔内网 nginx
+keep-alive timeout 短，之前 strategic projects GET 留下的连接被服务端关闭，undici 复用死
+socket → hang 到 30s AbortController 触发。
+
+**修复**：fetch 加 `Connection: close` 头，强制每次新建 TCP。代价微小，根本解决。
+经验已编码到 CLAUDE.md「已知陷阱」。
+
+**第三阶段：下载链路**
+- `services/attachment.ts:downloadFromStrategic` 调战投 `common/download?id={fileId}&isPreview=false`
+  → 流式返回 ReadableStream（同样加 `Connection: close`）
+- `routes/attachments.ts` 下载路由识别 `remote://{fileId}` 前缀 → 提取 fileId → 代理流式转发
+- `frontend/lib/api.ts:downloadAttachment` 改 `window.open` → `fetch + blob`
+  - 必须改：`window.open` 没法带 `Access-Token` header，而战投下载需要 IAM token 换战投 token
+  - 顺手：blob 下载支持中文文件名（RFC 5987 `filename*=UTF-8''`）
+
+#### 验证结果
+- 上传：3 个文件全部成功（377ms / 468ms / 1s），战投返回 fileId 入库为 `remote://{fileId}`
+- 下载：✅ 用户验证通过（fetch + blob 下载链路完整可用）
+
+#### Bug 状态变化
+- BUG-008 KWG 上传认证 401 → ✅ 完整修复（上传 + 下载，改走战投 fileBase 接口绕开 KWG）
+
+#### 文件改动
+- 新增 `backend/src/services/strategic-auth.ts`
+- 修改 `backend/src/services/strategic-api.ts`（用共享 auth 模块）
+- 修改 `backend/src/services/attachment.ts`（uploadVant + downloadFromStrategic + Connection: close）
+- 修改 `backend/src/routes/attachments.ts`（remote:// 下载代理）
+- 修改 `frontend/src/lib/api.ts`（fetch + blob 下载）
+- 修改 `frontend/src/components/file-upload.tsx`（调用签名）
+- 修改 `backend/.env.development` / `.env.production`（移除 KWG，加 STRATEGIC_UPLOAD_DATATYPE）
+- 修改 `CLAUDE.md`（undici 死连接陷阱）
+
+#### 下一步
+1. BUG-012/013/014 集中修复
+2. 推送本地领先 origin/main 的 commit
 
 <!-- 模板：复制以下内容用于新一天的记录
 
