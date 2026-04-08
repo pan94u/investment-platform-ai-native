@@ -13,6 +13,7 @@ import { mockRouter } from './routes/mock.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { webhooksRouter } from './routes/webhooks.js';
 import { mcpRouter } from './routes/mcp.js';
+import { devFeishuRouter } from './routes/dev-feishu-test.js';
 
 const app = new Hono();
 
@@ -42,6 +43,11 @@ app.route('/api/mock', mockRouter);
 app.route('/api/dashboard', dashboardRouter);
 app.route('/api/webhooks', webhooksRouter);
 app.route('/api/mcp', mcpRouter);
+
+// 开发期飞书测试 endpoint（生产不挂载）
+if (process.env.NODE_ENV !== 'production') {
+  app.route('/api/_dev', devFeishuRouter);
+}
 
 // 启动
 const port = Number(process.env.PORT ?? 3101);
