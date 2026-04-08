@@ -777,6 +777,81 @@ socket → hang 到 30s AbortController 触发。
 3. 用户验证 BUG-012 的 /todos 移动端页面 + BUG-013/014 去重效果
 4. 可选 BUG-009 推进（等战投系统补项目编号字段）
 
+### 飞书 IM 卡片联调成功（同 session 追加）
+
+**背景**：Phase 1 代码完成后，用户拿到**真正的测试环境 key** `cli_a55eec6dd49a9013`
+（之前给的 `cli_a798baf961ff100c` 不是测试环境，搞错了）。开始真实飞书联调。
+
+#### 联调诊断过程（4 轮）
+
+| 轮次 | 现象 | 假设 | 验证 | 结果 |
+|---|---|---|---|---|
+| 1 | 工号 `20111223` 查不到 user | 飞书 `batch_get_id` 支持 `employee_ids` | 直接传 `employee_ids: [empCode]` | ❌ `code:0 user_list:[]` — 字段被静默忽略 |
+| 2 | email 路径查不到 | 测试飞书通讯录没这个人 | 用 mobile `+8618656666788` 重试 | ❌ 同样查不到 |
+| 3 | 猜测应用可见范围不足 | 加 `/feishu-diagnose` 诊断 endpoint 调 `/contact/v3/scopes` | ⭐ 发现真相 |
+| 4 | 新测试 key `cli_a55eec6dd49a9013` diagnose 报 `code:99991672` | 缺少 `contact:user.id:readonly` scope | 用户开通权限后重试 | ✅ 工号 + email + mobile 三条路径全通 |
+
+#### 关键发现
+
+1. **飞书 `batch_get_id` 只支持 `emails` 和 `mobiles`，不支持 `employee_ids`**
+   - 官方文档未明说，但传了会被静默忽略（不报错，只是空结果）
+   - 所以 `emp_code → feishu open_id` 必须经过 **org 表查 email** 再查飞书
+2. **飞书权限错误 `code:99991672` 我之前吞成"用户不存在"**
+   - 当 code 非 0 时应该立即抛错 / 返回明确权限错误，不要 fall through 到 "user_list 空" 分支
+   - 已修复：`getOpenIdByEmpCode` / `getOpenIdByMobile` 都加了 code 检查
+3. **测试期调试 endpoint 非常关键**
+   - `/api/_dev/feishu-diagnose` 一次性返回 scopes/departments/tenant，能快速定位是不是权限问题
+   - `/api/_dev/feishu-card?mobile=xxx` 绕过 org 查询直接测 email 路径外的分支
+   - `/api/_dev/feishu-card?openId=ou_xxx` 跳过所有解析直接测卡片发送
+
+#### 最终验证结果
+
+**同一台 backend 先后收到 3 张卡片**（用户确认飞书已收到）：
+
+```
+[Feishu] mobile=+8618656666788 → open_id=ou_b1dd7a982fe34f4954ad0e235e26ee99
+[Feishu] empCode=20111223 → email=sunzeqi@haier.com → open_id=ou_b1dd7a982fe34f4954ad0e235e26ee99
+[Feishu] pushTodo OK → message_id=om_x100b526b...
+```
+
+- ✅ 工号 → email → open_id → 卡片送达
+- ✅ 手机号 → open_id → 卡片送达（测试路径）
+- ✅ 卡片按钮点开跳 `http://localhost:3100/todos/{approvalId}`（目前 linkBase 是 localhost，等公网域名）
+
+#### Phase 1.5 代码优化（联调中顺手改的）
+
+- `FeishuNotifyProvider`:
+  - 抽出 `sendCardToOpenId(openId, payload)` 私有方法，让 `pushTodo` 和 `pushTodoToOpenId` 共用
+  - 新增 `getOpenIdByMobile(mobile)` — 测试直查路径
+  - 新增 `pushTodoToOpenId(openId, payload)` — 绕过 empCode 解析的测试直发
+  - `getOpenIdByEmpCode` 清理掉无效的 `employee_ids` 策略（已验证飞书不支持）
+  - 所有查询接口都加 `code !== 0` 判断，区分权限错误和用户不存在
+- `dev-feishu-test.ts`:
+  - 支持三种触发方式：`?empCode` / `?mobile` / `?openId`
+  - 新增 `GET /api/_dev/feishu-diagnose` 一次性诊断应用可见范围
+
+#### 现在的完整生产流程（自动）
+
+```
+提交备案 → approvalService.submitFiling
+  → getNotifyProvider().pushTodo({ approverUserId: emp_code, ... })
+    → FeishuNotifyProvider.pushTodo
+      → getOpenIdByEmpCode(emp_code)
+        → getEmployeeByCode → org 表查 entEmail（AES-128-ECB 解密）
+        → batch_get_id(emails=[email]) → open_id
+      → sendCardToOpenId(open_id, payload) → 飞书 IM 卡片
+      → 返回 message_id 存到 approvals.external_todo_id
+```
+
+所有接入点零修改（submitFiling / processApproval / closeTodo 已接好）。
+
+#### 下一步
+
+1. ✅ 测试环境 key 已配置 + 权限 `contact:user.id:readonly` 已开通
+2. ⏳ 测试环境公网域名确定后替换 `FEISHU_TODO_LINK_BASE`
+3. ⏳ 走完整审批流联调：创建备案 → 提交 → 验证 approver 飞书收到卡片 → 点按钮跳 /todos → 处理 → 卡片变灰
+4. ⏳ `closeTodo` 的 PATCH 卡片更新实测（现在只有 pushTodo 验证过）
+
 <!-- 模板：复制以下内容用于新一天的记录
 
 ## YYYY-MM-DD
