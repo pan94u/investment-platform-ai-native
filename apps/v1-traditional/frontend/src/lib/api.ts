@@ -142,6 +142,7 @@ export const api = {
 
   // Approvals
   getApprovalTodos: () => requestWithAuth<unknown[]>('/approvals/todos'),
+  getApprovalTodo: (approvalId: string) => requestWithAuth<Record<string, unknown>>(`/approvals/todos/${approvalId}`),
   approveApproval: (id: string, comment?: string, emailOptions?: { skipEmail?: boolean; emailOverrides?: { to?: string[]; cc?: string[]; subject?: string } }) =>
     requestWithAuth<Record<string, unknown>>(`/approvals/${id}/approve`, { method: 'POST', body: JSON.stringify({ comment, ...emailOptions }) }),
   rejectApproval: (id: string, comment?: string) =>

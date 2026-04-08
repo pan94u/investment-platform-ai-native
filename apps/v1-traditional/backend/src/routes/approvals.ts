@@ -15,6 +15,23 @@ approvalsRouter.get('/todos', async (c) => {
   return c.json({ success: true, data: todos, error: null });
 });
 
+/** GET /api/approvals/todos/:id — 获取单条待办（移动端 / 飞书机器人 deep link）
+ *
+ * 不限制 status='pending'，已处理也返回数据让前端展示「已处理」状态。
+ */
+approvalsRouter.get('/todos/:id', async (c) => {
+  const user = c.get('user');
+  const todo = await approvalService.getApprovalTodoById(
+    c.req.param('id'),
+    user.id,
+    user.role === 'admin',
+  );
+  if (!todo) {
+    return c.json({ success: false, data: null, error: '待办不存在或无权查看' }, 404);
+  }
+  return c.json({ success: true, data: todo, error: null });
+});
+
 /** GET /api/approvals/history/:filingId — 获取审批历史 */
 approvalsRouter.get('/history/:filingId', async (c) => {
   const history = await approvalService.getApprovalHistory(c.req.param('filingId'));

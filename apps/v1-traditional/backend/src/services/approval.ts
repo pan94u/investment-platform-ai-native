@@ -15,6 +15,39 @@ export interface EmailOptions {
 
 // ─── 查询 ────────────────────────────────────────────
 
+/** todo 行的字段映射 — 列表 / 单条共享 */
+const TODO_COLUMNS = {
+  approvalId: approvals.id,
+  filingId: approvals.filingId,
+  filingNumber: filings.filingNumber,
+  filingTitle: filings.title,
+  filingType: filings.type,
+  creatorId: filings.creatorId,
+  domain: filings.domain,
+  amount: filings.amount,
+  stage: approvals.stage,
+  level: approvals.level,
+  groupName: approvals.groupName,
+  submittedAt: filings.submittedAt,
+  approverName: approvals.approverName,
+  // 单条页面需要：处理状态 + 历史意见 + 处理时间
+  status: approvals.status,
+  comment: approvals.comment,
+  decidedAt: approvals.decidedAt,
+} as const;
+
+/** 批量查创建人姓名并附加到 rows */
+async function enrichWithCreator<T extends { creatorId: string }>(
+  rows: T[],
+): Promise<Array<T & { creatorName: string }>> {
+  const creatorCodes = [...new Set(rows.map((r) => r.creatorId).filter(Boolean))];
+  const empMap = creatorCodes.length > 0 ? await getEmployeesByCode(creatorCodes) : new Map();
+  return rows.map((r) => ({
+    ...r,
+    creatorName: empMap.get(r.creatorId)?.name ?? r.creatorId,
+  }));
+}
+
 /** 获取待审批列表 */
 export async function getApprovalTodos(approverId: string, isAdmin = false) {
   const conditions = isAdmin
@@ -22,34 +55,41 @@ export async function getApprovalTodos(approverId: string, isAdmin = false) {
     : and(eq(approvals.approverId, approverId), eq(approvals.status, 'pending'));
 
   const rows = await db
-    .select({
-      approvalId: approvals.id,
-      filingId: approvals.filingId,
-      filingNumber: filings.filingNumber,
-      filingTitle: filings.title,
-      filingType: filings.type,
-      creatorId: filings.creatorId,
-      domain: filings.domain,
-      amount: filings.amount,
-      stage: approvals.stage,
-      level: approvals.level,
-      groupName: approvals.groupName,
-      submittedAt: filings.submittedAt,
-      approverName: approvals.approverName,
-    })
+    .select(TODO_COLUMNS)
     .from(approvals)
     .innerJoin(filings, eq(approvals.filingId, filings.id))
     .where(conditions)
     .orderBy(desc(filings.submittedAt));
 
-  // 批量查创建人姓名
-  const creatorCodes = [...new Set(rows.map(r => r.creatorId).filter(Boolean))];
-  const empMap = creatorCodes.length > 0 ? await getEmployeesByCode(creatorCodes) : new Map();
+  return enrichWithCreator(rows);
+}
 
-  return rows.map(r => ({
-    ...r,
-    creatorName: empMap.get(r.creatorId)?.name ?? r.creatorId,
-  }));
+/** 获取单条待办（用于飞书机器人 deep link 等移动端场景）
+ *
+ * 注意 — 不限制 status='pending'：飞书通知发出后用户点开时可能已被其他端处理，
+ * 此时返回当前状态，让前端展示「已处理 ✓」而不是 404。
+ *
+ * 鉴权：非 admin 必须是 approverId 本人，避免越权查看他人待办。
+ */
+export async function getApprovalTodoById(
+  approvalId: string,
+  approverId: string,
+  isAdmin = false,
+) {
+  const conditions = isAdmin
+    ? eq(approvals.id, approvalId)
+    : and(eq(approvals.id, approvalId), eq(approvals.approverId, approverId));
+
+  const rows = await db
+    .select(TODO_COLUMNS)
+    .from(approvals)
+    .innerJoin(filings, eq(approvals.filingId, filings.id))
+    .where(conditions)
+    .limit(1);
+
+  if (rows.length === 0) return null;
+  const [enriched] = await enrichWithCreator(rows);
+  return enriched;
 }
 
 /** 获取某备案的审批历史 */
