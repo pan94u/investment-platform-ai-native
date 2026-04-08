@@ -686,6 +686,97 @@ socket → hang 到 30s AbortController 触发。
 1. BUG-012/013/014 集中修复
 2. 推送本地领先 origin/main 的 commit
 
+### BUG-013/014 审批配置去重
+
+- 根因：`upsertApprovalGroupConfig` / `upsertEmailCcConfig` 名字带 upsert 但实际只 INSERT
+- 修复：INSERT 前按 `(groupName, lower(email))` 查 active 记录，重复抛友好错误
+- 邮箱新入库统一 normalize 成 lowercase，查询用 `sql\`lower(...)\`` 兼容旧混合大小写数据
+- Commit: `a021a3f`
+
+### BUG-012 移动端 /todos 路由 — 飞书机器人 deep link 入口
+
+**背景**：用户洞察 — `/todos` 不是简单的链接修复，而是为后面接入飞书机器人通知做准备。
+`/approvals` 是 364 行桌面端复杂页面（批量选择、reassign、邮件预览），飞书 webview 内嵌体验差。
+需要独立的移动端优化页面。
+
+**实施**：
+- 后端 `services/approval.ts` 抽出 `TODO_COLUMNS` + `enrichWithCreator` helper，列表/单条共享
+- 后端 `GET /api/approvals/todos/:id` 新增（鉴权 + 不限制 status=pending，已处理也返回状态）
+- 前端 `/todos` 移动端列表页：无 Nav、单列卡片、touch-friendly
+- 前端 `/todos/[approvalId]` 单条处理页：
+  - 固定显示意见 textarea（不用点按钮展开）
+  - 处理后留页面 + 展示「✓ 已同意/驳回/知悉」顶部横条
+  - 折叠「查看完整备案信息」— 结构化卡片（项目/投资细节/具体事项/邮件收件人），不用 JSON 原文
+  - 去掉了「桌面端打开」链接（用户觉得不适合高管）
+
+**遇到的坑**：
+- `pnpm --filter frontend build` 用了 production build，覆盖 dev server 的 `.next/` 目录，
+  导致浏览器老 chunk hash 404，IAMProvider 卡在「正在验证身份…」
+- 修复：删掉 `.next/` 重启 dev server；**以后验证类型用 `tsc --noEmit` 不要用 `next build`**
+
+**Commit**: `17e702e`
+
+### 飞书 IM 卡片通知 Phase 1
+
+**前置条件**：之前已经有 `NotifyProvider` 抽象 + `FeishuNotifyProvider` 骨架 + 注入点全部接好
+（submitFiling / processApproval / closeTodo），只需要重写 provider 实现即可。
+
+**重写 FeishuNotifyProvider**：
+- `pushTodo` 从飞书 Task V2 API 改为 **IM interactive 卡片消息**（`im/v1/messages`）
+- 卡片按钮 = 跳链接到 `${FEISHU_TODO_LINK_BASE}/todos/${approvalId}`（移动端处理页）
+- `closeTodo` 用 PATCH 消息更新卡片为「已处理 + 结果」灰色状态
+- `empCode → openId` 解析用 `contact/v3/users/batch_get_id`，内存缓存避免重复调用
+- `dry_run` 模式：true 时只 console.log 不真发，防误推到真实用户飞书
+
+**配置策略**：
+- dev: 测试环境 key `cli_a798baf961ff100c`，`DRY_RUN=false` 可真发
+- prod: 生产 key `cli_a56c0d4206f8d00c`，`DRY_RUN=false`
+- key 直接存 git（用户确认私有仓库）
+- `FEISHU_TODO_LINK_BASE` 占位 `http://localhost:3100`，等测试环境公网域名再替换
+
+**Dev 测试 endpoint**（仅非生产挂载）：
+- `POST /api/_dev/feishu-card?empCode=xxx` 触发一次卡片推送
+- `POST /api/_dev/feishu-close/:messageId` 关闭某条卡片
+
+**决策点对齐**：
+- ① 链接 base：C（部署到测试环境），开发期先占位 localhost
+- ② 卡片按钮：A（跳 /todos 链接），不做飞书事件回调，不需要公网 HTTPS 回调
+- ③ dry_run：默认 true 防误推，拿到测试 key 后改 false
+
+**Phase 2（后续）**：拿到测试环境公网域名后
+1. 替换 `FEISHU_TODO_LINK_BASE` 为真实域名
+2. 走完整审批流测试飞书卡片实际推送
+3. 飞书应用配置权限：`im:message:send_as_bot` + `contact:user.employee_id:readonly`
+
+**Commit**: `03f36b3`
+
+#### 本 Session 文件改动
+- 新增 `backend/src/services/strategic-auth.ts`（BUG-008 共享 token 模块）
+- 新增 `backend/src/routes/dev-feishu-test.ts`（飞书 dev 测试 endpoint）
+- 新增 `frontend/src/app/todos/page.tsx`（移动端待办列表）
+- 新增 `frontend/src/app/todos/[approvalId]/page.tsx`（移动端单条处理页）
+- 重写 `backend/src/providers/notify-feishu.ts`（IM 卡片通知）
+- 修改 `backend/src/services/admin-config.ts`（BUG-013/014 去重）
+- 修改 `backend/src/services/approval.ts`（抽共享 columns + 单条查询）
+- 修改 `backend/src/routes/approvals.ts`（/todos/:id 路由）
+- 修改 `backend/src/index.ts`（挂载 /_dev 路由）
+- 修改 `backend/.env.development` / `.env.production`（飞书配置）
+- 修改 `frontend/src/lib/api.ts`（getApprovalTodo）
+
+#### 统计快照
+- 本 Session commit：6 个（fix × 3 + feat × 2 + docs × 1）
+- 累计领先 origin/main：~6 commit
+- Bug 状态：
+  - ✅ 本 Session 新修：BUG-008（上传+下载完整）、BUG-012（/todos）、BUG-013/014（去重）
+  - ⏳ 仅 BUG-009 部分修复（项目编号 fallback）
+- 新能力：飞书 IM 卡片通知 Phase 1 完成
+
+#### 下一步
+1. 测试环境公网域名确定后 → 替换 `FEISHU_TODO_LINK_BASE`，关闭 dry_run，走完整审批流联调
+2. 飞书应用配置权限（`im:message:send_as_bot` + `contact:user.employee_id:readonly`）
+3. 用户验证 BUG-012 的 /todos 移动端页面 + BUG-013/014 去重效果
+4. 可选 BUG-009 推进（等战投系统补项目编号字段）
+
 <!-- 模板：复制以下内容用于新一天的记录
 
 ## YYYY-MM-DD
