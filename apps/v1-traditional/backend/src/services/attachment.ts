@@ -4,55 +4,19 @@ import { db } from '../lib/db.js';
 import { generateId } from '../lib/id.js';
 import * as auditService from './audit.js';
 import { getEmployeesByCode } from './org-query.js';
+import { getStrategicApiBase, getStrategicToken } from './strategic-auth.js';
 
 /**
- * 投资知识平台(KWG)文档上传
- * 认证流程: IAM token → GET ${KWG_BASE}/api/haier/auth/getTokenByIam?iamToken=<IAM> → 拿到 KWG token
- * 测试: https://prehsip.haier.net/kwg
- * 生产: https://hsip.haier.net/kwg
+ * 战投系统文件上传 — /file/fileBase/uploadVant
+ * 认证: 复用 strategic-auth getStrategicToken（IAM → checkUser → 战投 token）
+ * 接口签名: POST multipart/form-data
+ *   - dataType: 业务分类（影响存储路径）
+ *   - files: 文件列表
+ * 返回: AjaxResult { code:200, msg, data: [{ fileName, fileId }] }
  */
-const KWG_BASE = process.env.KWG_API_BASE ?? 'https://prehsip.haier.net/kwg';
-const UPLOAD_API_URL = `${KWG_BASE}/api/kwgDocument/upload`;
-
+const UPLOAD_API_URL = `${getStrategicApiBase()}/file/fileBase/uploadVant`;
+const UPLOAD_DATA_TYPE = process.env.STRATEGIC_UPLOAD_DATATYPE ?? 'investmentFiling';
 const UPLOAD_TIMEOUT = 30_000; // 30s
-const TOKEN_TIMEOUT = 8000;
-const TOKEN_TTL = 25 * 60 * 1000; // 25 minutes
-
-// KWG token 缓存
-let kwgTokenCache: { token: string; ts: number; key: string } | null = null;
-
-/** 用 IAM token 换取 KWG token */
-async function getKwgToken(iamToken: string): Promise<string> {
-  const cacheKey = iamToken.slice(0, 16);
-  if (kwgTokenCache && kwgTokenCache.key === cacheKey && Date.now() - kwgTokenCache.ts < TOKEN_TTL) {
-    return kwgTokenCache.token;
-  }
-
-  const url = `${KWG_BASE}/api/haier/auth/getTokenByIam?iamToken=${encodeURIComponent(iamToken)}`;
-  console.log('[KWG] 换取 token:', url.replace(iamToken, '***'));
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TOKEN_TIMEOUT);
-  try {
-    const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) throw new Error(`getTokenByIam HTTP ${res.status}`);
-    const json = await res.json() as Record<string, unknown>;
-    console.log('[KWG] getTokenByIam 响应:', JSON.stringify(json).slice(0, 300));
-
-    // 兼容多种返回格式: data / datas / result
-    const data = (json.data ?? json.datas ?? json.result ?? json) as Record<string, unknown>;
-    const token = (data.token ?? data.accessToken ?? data.access_token ?? json.token ?? '') as string;
-    if (!token) {
-      console.error('[KWG] getTokenByIam 无法提取 token，完整响应:', JSON.stringify(json));
-      throw new Error(`getTokenByIam 失败: ${(json.message ?? json.msg ?? 'unknown') as string}`);
-    }
-
-    kwgTokenCache = { token, ts: Date.now(), key: cacheKey };
-    return token;
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 const ALLOWED_MIME_TYPES = new Set([
   'application/msword',
@@ -69,38 +33,118 @@ const ALLOWED_MIME_TYPES = new Set([
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
-/** 调用远程文档上传接口 */
-async function uploadToRemote(file: File, iamToken: string): Promise<{ fileUrl: string; fileId?: string }> {
-  const kwgToken = await getKwgToken(iamToken);
+/** 手动构造 multipart/form-data body
+ *
+ * 注意: 不能用 Node 原生 FormData + fetch —— undici 会用 Transfer-Encoding: chunked
+ * 不预先计算 Content-Length，战投后端 (Spring StandardMultipartHttpServletRequest)
+ * 不接受 chunked multipart，会永远 hang 等 Content-Length。
+ * 已验证 6 轮：curl 1 秒返回 200，Node fetch + FormData 30s 准时 abort。
+ */
+async function buildMultipartBody(
+  fields: Array<{ name: string; value: string }>,
+  file: { name: string; type: string; buffer: Buffer },
+): Promise<{ body: Buffer; contentType: string }> {
+  const boundary = `----InvestmentFilingBoundary${Math.random().toString(16).slice(2)}${Date.now().toString(16)}`;
+  const CRLF = '\r\n';
+  const parts: Buffer[] = [];
 
-  const formData = new FormData();
-  formData.append('file', file);
+  // 普通字段
+  for (const { name, value } of fields) {
+    parts.push(
+      Buffer.from(
+        `--${boundary}${CRLF}` +
+          `Content-Disposition: form-data; name="${name}"${CRLF}${CRLF}` +
+          `${value}${CRLF}`,
+        'utf8',
+      ),
+    );
+  }
+
+  // 文件字段（filename 直接放原始字节，UTF-8 编码，多数后端都能处理中文）
+  parts.push(
+    Buffer.from(
+      `--${boundary}${CRLF}` +
+        `Content-Disposition: form-data; name="files"; filename="${file.name}"${CRLF}` +
+        `Content-Type: ${file.type || 'application/octet-stream'}${CRLF}${CRLF}`,
+      'utf8',
+    ),
+  );
+  parts.push(file.buffer);
+  parts.push(Buffer.from(CRLF, 'utf8'));
+
+  // 结束 boundary
+  parts.push(Buffer.from(`--${boundary}--${CRLF}`, 'utf8'));
+
+  return {
+    body: Buffer.concat(parts),
+    contentType: `multipart/form-data; boundary=${boundary}`,
+  };
+}
+
+/** 调用战投系统 uploadVant 接口
+ *
+ * 战投后端 (FileBaseController.uploadVant) 签名:
+ *   POST /file/fileBase/uploadVant
+ *   form-data: dataType (string), files (file[])
+ *   return: AjaxResult.success(List<FileBase>) — 即 { code, msg, data: [{ id, url, realName, ... }] }
+ */
+async function uploadToRemote(file: File, iamToken: string): Promise<{ fileUrl: string; fileId?: string }> {
+  const token = await getStrategicToken(iamToken);
+
+  const fileBuffer = Buffer.from(await file.arrayBuffer());
+  const { body, contentType } = await buildMultipartBody(
+    [{ name: 'dataType', value: UPLOAD_DATA_TYPE }],
+    { name: file.name, type: file.type, buffer: fileBuffer },
+  );
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT);
 
   try {
+    console.log(
+      `[Attachment] 上传至战投: ${UPLOAD_API_URL} dataType=${UPLOAD_DATA_TYPE} file=${file.name} size=${body.length}`,
+    );
     const res = await fetch(UPLOAD_API_URL, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${kwgToken}` },
-      body: formData,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': contentType,
+        'Content-Length': String(body.length),
+        // 关键: 不复用连接池中的死连接（战投 nginx keep-alive 时间短，
+        // 此前 strategic-api GET 留下的连接可能已被服务端单方面关闭，
+        // undici 复用它会导致 30s 超时）
+        'Connection': 'close',
+      },
+      body,
       signal: controller.signal,
     });
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`文档上传服务返回 ${res.status}: ${text.slice(0, 100)}`);
+      throw new Error(`战投上传返回 ${res.status}: ${text.slice(0, 200)}`);
     }
 
     const json = await res.json() as Record<string, unknown>;
+    console.log('[Attachment] uploadVant 响应:', JSON.stringify(json).slice(0, 400));
 
-    // 兼容多种返回格式
-    const data = (json.data ?? json.datas ?? json.result ?? json) as Record<string, unknown>;
-    const fileUrl = (data.url ?? data.fileUrl ?? data.filePath ?? data.path ?? '') as string;
-    const fileId = (data.id ?? data.fileId ?? data.documentId ?? '') as string;
+    // AjaxResult code 非 200 视为失败
+    const code = json.code as number | undefined;
+    if (code !== undefined && code !== 200) {
+      throw new Error(`战投上传业务失败 code=${code} msg=${(json.msg ?? json.message ?? 'unknown') as string}`);
+    }
 
-    if (!fileUrl) {
-      console.warn('[Attachment] 远程上传返回无 URL，原始响应:', JSON.stringify(json));
+    // 兼容: data 可能是 List<FileBase> 或 单个 FileBase 或 直接字段
+    const dataRaw = (json.data ?? json.datas ?? json.result ?? json) as unknown;
+    const first = (Array.isArray(dataRaw) ? dataRaw[0] : dataRaw) as Record<string, unknown> | undefined;
+    if (!first || typeof first !== 'object') {
+      throw new Error('战投上传返回结构异常: 无 data');
+    }
+
+    const fileUrl = (first.url ?? first.fileUrl ?? first.filePath ?? first.path ?? '') as string;
+    const fileId = (first.id ?? first.fileId ?? first.documentId ?? '') as string;
+
+    if (!fileUrl && !fileId) {
+      console.warn('[Attachment] 战投上传返回无 URL/ID，原始响应:', JSON.stringify(json));
     }
 
     return { fileUrl, fileId };
@@ -109,7 +153,45 @@ async function uploadToRemote(file: File, iamToken: string): Promise<{ fileUrl: 
   }
 }
 
-/** 仅代理上传到 KWG，不写 DB（新建备案时 filingId 还不存在） */
+/** 从战投系统下载文件，返回流式响应
+ *
+ * 战投后端 (FileBaseController.fileDownload):
+ *   GET /file/fileBase/common/download?id={fileId}&isPreview=false
+ *   返回二进制流（response.getOutputStream().write）
+ */
+export async function downloadFromStrategic(
+  fileId: string,
+  iamToken: string,
+): Promise<{ body: ReadableStream<Uint8Array>; contentType: string; contentLength?: number }> {
+  const token = await getStrategicToken(iamToken);
+  const url = `${getStrategicApiBase()}/file/fileBase/common/download?id=${encodeURIComponent(fileId)}&isPreview=false`;
+
+  console.log(`[Attachment] 战投下载: ${url}`);
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      // 同上传：避免 undici 复用已被服务端关闭的 keep-alive 连接
+      'Connection': 'close',
+    },
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`战投下载返回 ${res.status}: ${text.slice(0, 200)}`);
+  }
+
+  if (!res.body) {
+    throw new Error('战投下载响应无 body');
+  }
+
+  return {
+    body: res.body,
+    contentType: res.headers.get('content-type') ?? 'application/octet-stream',
+    contentLength: Number(res.headers.get('content-length') ?? 0) || undefined,
+  };
+}
+
+/** 仅代理上传到战投，不写 DB（新建备案时 filingId 还不存在） */
 export async function proxyUpload(file: File, iamToken: string) {
   if (!ALLOWED_MIME_TYPES.has(file.type)) {
     throw new Error(`不支持的文件类型: ${file.type}`);

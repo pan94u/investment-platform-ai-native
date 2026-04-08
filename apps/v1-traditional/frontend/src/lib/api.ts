@@ -196,15 +196,41 @@ export const api = {
     }),
   getAttachments: (filingId: string) =>
     requestWithAuth<Array<{ id: string; filingId: string; filename: string; filePath: string; fileSize: number; mimeType: string; uploadedBy: string; uploaderName: string | null; createdAt: string }>>(`/filings/${filingId}/attachments`),
-  downloadAttachment: (id: string, filePath?: string) => {
-    // 远程 URL 直接打开
+  downloadAttachment: async (id: string, filename: string, filePath?: string) => {
+    // 远程 http URL 直接打开
     if (filePath?.startsWith('http')) {
       window.open(filePath, '_blank')
       return
     }
-    // 本地文件走后端代理下载
+    // 走后端代理（本地文件 + remote:// 战投文件）
+    // 必须用 fetch + blob，因为战投下载需要 Access-Token header（IAM token）换战投 token，
+    // window.open 没法带 header
     const userId = getUserId()
-    window.open(`${API_BASE}/attachments/${id}/download?userId=${userId}`, '_blank')
+    const token = typeof window !== 'undefined' ? localStorage.getItem('haier-user-center-access-token') : null
+    const res = await fetch(`${API_BASE}/attachments/${id}/download?userId=${userId}`, {
+      headers: {
+        ...(token ? { 'Access-Token': token } : {}),
+        'X-User-Id': userId,
+      },
+    })
+    if (!res.ok) {
+      let msg = `下载失败 ${res.status}`
+      try {
+        const json = await res.json() as { error?: string }
+        if (json.error) msg = json.error
+      } catch { /* ignore */ }
+      alert(msg)
+      return
+    }
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   },
   deleteAttachment: (id: string) =>
     requestWithAuth<null>(`/attachments/${id}`, { method: 'DELETE' }),

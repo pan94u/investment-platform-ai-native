@@ -10,7 +10,7 @@ const attachmentsRouter = new Hono<AppEnv>();
 
 attachmentsRouter.use('/*', authMiddleware);
 
-/** POST /api/attachments/upload-proxy — 仅代理上传到 KWG，返回 URL（不写 DB） */
+/** POST /api/attachments/upload-proxy — 仅代理上传到战投，返回 URL（不写 DB） */
 attachmentsRouter.post('/attachments/upload-proxy', async (c) => {
   const iamToken = c.req.header('access-token') ?? '';
   try {
@@ -86,9 +86,28 @@ attachmentsRouter.get('/attachments/:id/download', async (c) => {
     return c.redirect(attachment.filePath);
   }
 
-  // remote:// 占位符 → 无法下载
+  // remote://{fileId} → 调战投 download 接口流式转发
   if (attachment.filePath.startsWith('remote://')) {
-    return c.json({ success: false, data: null, error: '文件存储在远程系统，请通过文档管理平台下载' }, 400);
+    const fileId = attachment.filePath.slice('remote://'.length);
+    if (!fileId || fileId === 'uploaded') {
+      return c.json({ success: false, data: null, error: '附件 fileId 缺失，无法下载' }, 400);
+    }
+    const iamToken = c.req.header('access-token') ?? '';
+    if (!iamToken) {
+      return c.json({ success: false, data: null, error: '缺少 access-token，无法访问远程文件' }, 401);
+    }
+    try {
+      const { body, contentType, contentLength } = await attachmentService.downloadFromStrategic(fileId, iamToken);
+      c.header('Content-Type', contentType || attachment.mimeType);
+      // 中文文件名用 RFC 5987 编码
+      c.header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(attachment.filename)}`);
+      if (contentLength) c.header('Content-Length', String(contentLength));
+      return new Response(body, { headers: c.res.headers });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '战投下载失败';
+      console.error('[Attachment] 战投下载失败:', message);
+      return c.json({ success: false, data: null, error: message }, 502);
+    }
   }
 
   // 本地文件 → 流式返回
@@ -97,7 +116,7 @@ attachmentsRouter.get('/attachments/:id/download', async (c) => {
     const stream = createReadStream(attachment.filePath);
 
     c.header('Content-Type', attachment.mimeType);
-    c.header('Content-Disposition', `attachment; filename="${encodeURIComponent(attachment.filename)}"`);
+    c.header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(attachment.filename)}`);
     c.header('Content-Length', String(fileStat.size));
 
     const webStream = Readable.toWeb(stream) as ReadableStream;

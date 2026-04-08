@@ -41,7 +41,7 @@ interface FileUploadProps {
   readonly?: boolean;
 }
 
-/** 通过后端代理上传到 KWG，返回 URL */
+/** 通过后端代理上传到战投系统，返回 URL */
 async function uploadViaProxy(file: File): Promise<UploadedFileRef> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('haier-user-center-access-token') : null;
   const formData = new FormData();
@@ -225,7 +225,7 @@ export function FileUpload({ filingId, onFilesChange, readonly }: FileUploadProp
                 <span className="shrink-0 text-xs text-gray-300">{formatSize(f.fileSize)}</span>
               </div>
               <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                <button type="button" onClick={() => api.downloadAttachment(f.id, f.filePath)}
+                <button type="button" onClick={() => api.downloadAttachment(f.id, f.filename, f.filePath)}
                   className="rounded px-2 py-0.5 text-xs text-[#0066CC] hover:bg-blue-50">下载</button>
                 {!readonly && (
                   <button type="button" onClick={() => handleDelete(f.id, f.filename)}
