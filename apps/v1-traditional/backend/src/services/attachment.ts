@@ -252,7 +252,7 @@ export async function uploadAttachment(
 
   // 写 DB
   const id = generateId('att');
-  const [attachment] = await db.insert(attachments).values({
+  await db.insert(attachments).values({
     id,
     filingId,
     filename: file.name,
@@ -260,7 +260,8 @@ export async function uploadAttachment(
     fileSize: file.size,
     mimeType: file.type,
     uploadedBy: userId,
-  }).returning();
+  });
+  const [attachment] = await db.select().from(attachments).where(eq(attachments.id, id)).limit(1);
 
   await auditService.logAudit({
     action: 'attachment_uploaded',
@@ -285,7 +286,7 @@ export async function registerAttachment(
   if (filing.length === 0) throw new Error('备案不存在');
 
   const id = generateId('att');
-  const [attachment] = await db.insert(attachments).values({
+  await db.insert(attachments).values({
     id,
     filingId,
     filename: data.filename,
@@ -293,7 +294,8 @@ export async function registerAttachment(
     fileSize: data.fileSize,
     mimeType: data.mimeType,
     uploadedBy: userId,
-  }).returning();
+  });
+  const [attachment] = await db.select().from(attachments).where(eq(attachments.id, id)).limit(1);
 
   await auditService.logAudit({
     action: 'attachment_uploaded',

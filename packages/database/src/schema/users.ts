@@ -1,14 +1,15 @@
-import { pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { mysqlTable, varchar, timestamp } from 'drizzle-orm/mysql-core';
+import { sql } from 'drizzle-orm';
 
-export const users = pgTable('users', {
-  id: text('id').primaryKey(),
+export const users = mysqlTable('inv_users', {
+  id: varchar('id', { length: 36 }).primaryKey(),
   username: varchar('username', { length: 50 }).notNull().unique(),
-  passwordHash: text('password_hash').notNull(),
+  passwordHash: varchar('password_hash', { length: 255 }).notNull(),
   name: varchar('name', { length: 100 }).notNull(),
-  role: varchar('role', { length: 20 }).notNull(),            // initiator | supervisor | group_approver | admin | viewer
+  role: varchar('role', { length: 20 }).notNull(),
   department: varchar('department', { length: 100 }).notNull(),
-  domain: varchar('domain', { length: 50 }).notNull(),         // smart_living | industrial_finance | health
-  email: varchar('email', { length: 200 }),                    // nullable
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  domain: varchar('domain', { length: 50 }).notNull(),
+  email: varchar('email', { length: 200 }),
+  createdAt: timestamp('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
 });

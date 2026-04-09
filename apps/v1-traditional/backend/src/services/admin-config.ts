@@ -60,14 +60,15 @@ export async function upsertApprovalGroupConfig(
   }
 
   const id = generateId('ac');
-  const [config] = await db.insert(approvalConfigs).values({
+  await db.insert(approvalConfigs).values({
     id,
     groupName,
     userId,
     userName,
     userEmail: normalizedEmail,
     isActive: true,
-  }).returning();
+  });
+  const [config] = await db.select().from(approvalConfigs).where(eq(approvalConfigs.id, id)).limit(1);
 
   await auditService.logAudit({
     action: 'config_updated',
@@ -153,13 +154,14 @@ export async function upsertEmailCcConfig(
   }
 
   const id = generateId('ecc');
-  const [config] = await db.insert(emailCcConfigs).values({
+  await db.insert(emailCcConfigs).values({
     id,
     groupName,
     name,
     email: normalizedEmail,
     isActive: true,
-  }).returning();
+  });
+  const [config] = await db.select().from(emailCcConfigs).where(eq(emailCcConfigs.id, id)).limit(1);
 
   await auditService.logAudit({
     action: 'config_updated',

@@ -11,6 +11,7 @@ import { RecipientPicker } from '@/components/recipient-picker';
 import {
   FILING_TYPE_LABELS, PROJECT_STAGE_LABELS, TYPE_ALLOWED_STAGES,
   APPROVAL_GROUP_LABELS, APPROVAL_GROUPS,
+  PROJECT_CATEGORY_LABELS, AMOUNT_TOOLTIP,
 } from '@/lib/constants';
 
 export default function EditFilingPage() {
@@ -21,23 +22,19 @@ export default function EditFilingPage() {
   const [error, setError] = useState('');
   const [domains, setDomains] = useState<Array<{ code: string; name: string }>>([]);
   const [industries, setIndustries] = useState<Array<{ code: string; name: string }>>([]);
+  const currentUser = getCurrentUser();
   const [form, setForm] = useState({
     type: '',
     projectStage: '',
+    projectCategory: '',
     title: '',
     description: '',
     projectName: '',
     projectCode: '',
-    legalEntityName: '',
     domain: '',
     domainCode: '',
     industry: '',
     amount: '',
-    investmentRatio: '',
-    valuationAmount: '',
-    originalTarget: '',
-    newTarget: '',
-    changeReason: '',
     approvalGroups: [] as string[],
     emailRecipients: [] as string[],
   });
@@ -60,20 +57,15 @@ export default function EditFilingPage() {
       setForm({
         type: (f.type as string) || '',
         projectStage: (f.projectStage as string) || 'invest',
+        projectCategory: (f.projectCategory as string) || '',
         title: (f.title as string) || '',
         description: (f.description as string) || '',
         projectName: (f.projectName as string) || '',
         projectCode: (f.projectCode as string) || '',
-        legalEntityName: (f.legalEntityName as string) || '',
         domain: (f.domain as string) || '',
         domainCode: (f.domainCode as string) || '',
         industry: (f.industry as string) || '',
         amount: f.amount ? String(Number(f.amount)) : '',
-        investmentRatio: f.investmentRatio ? String(Number(f.investmentRatio)) : '',
-        valuationAmount: f.valuationAmount ? String(Number(f.valuationAmount)) : '',
-        originalTarget: f.originalTarget ? String(Number(f.originalTarget)) : '',
-        newTarget: f.newTarget ? String(Number(f.newTarget)) : '',
-        changeReason: (f.changeReason as string) || '',
         approvalGroups: (f.approvalGroups as string[]) || [],
         emailRecipients: (f.emailRecipients as string[]) || [],
       });
@@ -109,13 +101,8 @@ export default function EditFilingPage() {
         approvalGroups: form.approvalGroups,
         emailRecipients: form.emailRecipients,
       };
+      if (form.projectCategory) data.projectCategory = form.projectCategory;
       if (form.projectCode) data.projectCode = form.projectCode;
-      if (form.legalEntityName) data.legalEntityName = form.legalEntityName;
-      if (form.investmentRatio) data.investmentRatio = Number(form.investmentRatio);
-      if (form.valuationAmount) data.valuationAmount = Number(form.valuationAmount);
-      if (form.originalTarget) data.originalTarget = Number(form.originalTarget);
-      if (form.newTarget) data.newTarget = Number(form.newTarget);
-      if (form.changeReason) data.changeReason = form.changeReason;
 
       await api.updateFiling(id, data);
       if (andSubmit) {
@@ -141,8 +128,6 @@ export default function EditFilingPage() {
   }
 
   const allowedStages = TYPE_ALLOWED_STAGES[form.type] ?? [];
-  const showDirectFields = form.type === 'equity_direct' || form.type === 'legal_entity';
-  const showEarnoutFields = form.projectStage === 'change';
 
   return (
     <div className="min-h-screen bg-[#FAFAF9]">
@@ -164,38 +149,7 @@ export default function EditFilingPage() {
           )}
 
           <div className="card space-y-5 p-6">
-            {allowedStages.length > 1 && (
-              <Field label="项目阶段" required>
-                <div className="flex gap-2 flex-wrap">
-                  {allowedStages.map((s) => (
-                    <button key={s} onClick={() => update('projectStage', s)}
-                      className={`rounded-md border px-4 py-2 text-sm font-medium transition ${
-                        form.projectStage === s ? 'border-[#0066CC] bg-blue-50 text-[#0066CC]' : 'border-gray-200 bg-white text-gray-500 hover:border-blue-300'
-                      }`}>{PROJECT_STAGE_LABELS[s]}</button>
-                  ))}
-                </div>
-              </Field>
-            )}
-
-            <Field label="项目说明" required>
-              <input value={form.title} onChange={(e) => update('title', e.target.value)} className="form-input" placeholder="一句话摘要" />
-            </Field>
-            <Field label="项目名称" required>
-              <ProjectAutocomplete
-                filingType={form.type}
-                value={form.projectName}
-                onChange={(name, code) => {
-                  update('projectName', name);
-                  if (code) update('projectCode', code);
-                }}
-              />
-            </Field>
-            <Field label="项目编号">
-              <input value={form.projectCode} onChange={(e) => update('projectCode', e.target.value)} className="form-input" placeholder="自动生成或手工输入" />
-            </Field>
-            <Field label="法人主体">
-              <input value={form.legalEntityName} onChange={(e) => update('legalEntityName', e.target.value)} className="form-input" />
-            </Field>
+            {/* 1. 投资领域 + 行业 */}
             <div className="grid grid-cols-2 gap-4">
               <Field label="投资领域" required>
                 <select value={form.domainCode} onChange={(e) => {
@@ -215,37 +169,78 @@ export default function EditFilingPage() {
                 </select>
               </Field>
             </div>
-            <Field label="项目涉及金额（万元）" required>
-              <input type="number" value={form.amount} onChange={(e) => update('amount', e.target.value)} className="form-input" />
+
+            {/* 2. 项目类型 */}
+            <Field label="项目类型" required>
+              <select value={form.projectCategory} onChange={(e) => update('projectCategory', e.target.value)} className="form-input form-select">
+                <option value="">请选择项目类型</option>
+                {Object.entries(PROJECT_CATEGORY_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
             </Field>
 
-            {showDirectFields && (
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="投资比例 (%)">
-                  <input type="number" value={form.investmentRatio} onChange={(e) => update('investmentRatio', e.target.value)} className="form-input" />
-                </Field>
-                <Field label="估值金额（万元）">
-                  <input type="number" value={form.valuationAmount} onChange={(e) => update('valuationAmount', e.target.value)} className="form-input" />
-                </Field>
-              </div>
-            )}
+            {/* 3. 项目名称 */}
+            <Field label="项目名称" required>
+              <ProjectAutocomplete
+                filingType={form.type}
+                value={form.projectName}
+                onChange={(name, code) => {
+                  update('projectName', name);
+                  if (code) update('projectCode', code);
+                }}
+              />
+            </Field>
 
-            {showEarnoutFields && (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="原对赌目标（万元）">
-                    <input type="number" value={form.originalTarget} onChange={(e) => update('originalTarget', e.target.value)} className="form-input" />
-                  </Field>
-                  <Field label="新对赌目标（万元）">
-                    <input type="number" value={form.newTarget} onChange={(e) => update('newTarget', e.target.value)} className="form-input" />
-                  </Field>
+            {/* 4. 项目编号 */}
+            <Field label="项目编号">
+              <input value={form.projectCode} onChange={(e) => update('projectCode', e.target.value)} className="form-input" placeholder="自动生成或手工输入" />
+            </Field>
+
+            {/* 5. 项目阶段 */}
+            {allowedStages.length > 1 && (
+              <Field label="项目阶段" required>
+                <div className="flex gap-2 flex-wrap">
+                  {allowedStages.map((s) => (
+                    <button key={s} onClick={() => update('projectStage', s)}
+                      className={`rounded-md border px-4 py-2 text-sm font-medium transition ${
+                        form.projectStage === s ? 'border-[#0066CC] bg-blue-50 text-[#0066CC]' : 'border-gray-200 bg-white text-gray-500 hover:border-blue-300'
+                      }`}>{PROJECT_STAGE_LABELS[s]}</button>
+                  ))}
                 </div>
-                <Field label="变更原因">
-                  <textarea value={form.changeReason} onChange={(e) => update('changeReason', e.target.value)} className="form-input min-h-[72px] resize-none" />
-                </Field>
-              </>
+              </Field>
             )}
 
+            {/* 6. 金额 + tooltip */}
+            <Field label="项目涉及金额（万元）" required>
+              <div className="relative">
+                <input type="number" value={form.amount} onChange={(e) => update('amount', e.target.value)} className="form-input pr-8"
+                  placeholder={form.projectStage === 'exit' ? '请填写退出金额' : '请填写投资金额'} />
+                <div className="group absolute right-2.5 top-1/2 -translate-y-1/2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-300 cursor-help"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                  <div className="invisible group-hover:visible absolute right-0 bottom-full mb-1.5 w-56 rounded-md bg-gray-800 px-3 py-2 text-xs text-white shadow-lg z-10">
+                    {AMOUNT_TOOLTIP}
+                  </div>
+                </div>
+              </div>
+            </Field>
+
+            {/* 7. 备案发起人 + 备案时间 */}
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="备案发起人">
+                <input value={currentUser?.name ?? '-'} readOnly className="form-input bg-gray-50 text-gray-500 cursor-not-allowed" />
+              </Field>
+              <Field label="备案时间">
+                <input value="提交后自动生成" readOnly className="form-input bg-gray-50 text-gray-400 cursor-not-allowed" />
+              </Field>
+            </div>
+
+            {/* 8. 项目说明 */}
+            <Field label="项目说明" required>
+              <input value={form.title} onChange={(e) => update('title', e.target.value)} className="form-input" placeholder="一句话摘要" />
+            </Field>
+
+            {/* 9. 备案具体事项 */}
             <Field label="备案具体事项">
               <RichTextEditor
                 value={form.description}

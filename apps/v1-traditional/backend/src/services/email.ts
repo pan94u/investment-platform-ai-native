@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { filings, approvals, attachments, emailCcConfigs } from '@filing/database';
-import { FILING_TYPE_CONFIG, APPROVAL_GROUP_CONFIG, PROJECT_STAGE_CONFIG } from '@filing/shared';
+import { FILING_TYPE_CONFIG, APPROVAL_GROUP_CONFIG, PROJECT_STAGE_CONFIG, PROJECT_CATEGORY_CONFIG } from '@filing/shared';
 import { db } from '../lib/db.js';
 import { getEmailProvider } from '../providers/index.js';
 import * as auditService from './audit.js';
@@ -88,11 +88,16 @@ export async function getEmailPreview(filingId: string): Promise<EmailPreviewDat
   const typeLabel = FILING_TYPE_CONFIG[filing.type as keyof typeof FILING_TYPE_CONFIG]?.label ?? filing.type;
   const stageLabel = PROJECT_STAGE_CONFIG[filing.projectStage as keyof typeof PROJECT_STAGE_CONFIG]?.label ?? filing.projectStage;
 
+  const categoryLabel = filing.projectCategory
+    ? (PROJECT_CATEGORY_CONFIG[filing.projectCategory as keyof typeof PROJECT_CATEGORY_CONFIG]?.label ?? filing.projectCategory)
+    : null;
+
   const htmlBody = buildEmailHtml({
     filingNumber: filing.filingNumber,
     title: filing.title,
     type: typeLabel,
     stage: stageLabel,
+    projectCategory: categoryLabel,
     projectName: filing.projectName,
     projectCode: filing.projectCode ?? '-',
     amount: filing.amount,
@@ -195,6 +200,7 @@ function buildEmailHtml(data: {
   title: string;
   type: string;
   stage: string;
+  projectCategory: string | null;
   projectName: string;
   projectCode: string;
   amount: string;
@@ -219,6 +225,7 @@ function buildEmailHtml(data: {
 
     <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
       <tr><td style="padding: 8px 0; color: #666; width: 120px;">备案类型</td><td style="padding: 8px 0;">${data.type} · ${data.stage}</td></tr>
+      ${data.projectCategory ? `<tr><td style="padding: 8px 0; color: #666;">项目类型</td><td style="padding: 8px 0;">${data.projectCategory}</td></tr>` : ''}
       <tr><td style="padding: 8px 0; color: #666;">项目名称</td><td style="padding: 8px 0;">${data.projectName}</td></tr>
       <tr><td style="padding: 8px 0; color: #666;">项目编号</td><td style="padding: 8px 0;">${data.projectCode}</td></tr>
       <tr><td style="padding: 8px 0; color: #666;">金额</td><td style="padding: 8px 0; font-weight: 600;">${Number(data.amount).toLocaleString()} 万元</td></tr>

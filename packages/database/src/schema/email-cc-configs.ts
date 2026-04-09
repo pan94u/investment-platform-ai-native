@@ -1,10 +1,11 @@
-import { pgTable, text, timestamp, varchar, boolean } from 'drizzle-orm/pg-core';
+import { mysqlTable, varchar, timestamp, boolean } from 'drizzle-orm/mysql-core';
+import { sql } from 'drizzle-orm';
 
-export const emailCcConfigs = pgTable('email_cc_configs', {
-  id: text('id').primaryKey(),
-  groupName: varchar('group_name', { length: 30 }).notNull(),  // finance|hr|strategy|legal|audit
+export const emailCcConfigs = mysqlTable('inv_email_cc_configs', {
+  id: varchar('id', { length: 36 }).primaryKey(),
+  groupName: varchar('group_name', { length: 30 }).notNull(),
   name: varchar('name', { length: 100 }).notNull(),
   email: varchar('email', { length: 200 }).notNull(),
   isActive: boolean('is_active').notNull().default(true),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
 });

@@ -136,9 +136,9 @@ importers:
       drizzle-orm:
         specifier: ^0.38.0
         version: 0.38.4(@types/react@19.2.14)(mysql2@3.20.0(@types/node@25.4.0))(postgres@3.4.8)(react@19.2.4)
-      postgres:
-        specifier: ^3.4.0
-        version: 3.4.8
+      mysql2:
+        specifier: ^3.11.0
+        version: 3.20.0(@types/node@25.4.0)
     devDependencies:
       '@types/node':
         specifier: ^25.4.0
@@ -3201,7 +3201,6 @@ snapshots:
       lru.min: 1.1.4
       named-placeholders: 1.1.6
       sql-escaper: 1.3.3
-    optional: true
 
   named-placeholders@1.1.6:
     dependencies:

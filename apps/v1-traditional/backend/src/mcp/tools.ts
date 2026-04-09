@@ -1,4 +1,4 @@
-import { eq, and, ilike, gte, lte, sql, desc, count } from 'drizzle-orm';
+import { eq, and, like, gte, lte, sql, desc, count } from 'drizzle-orm';
 import { filings, approvals, users } from '@filing/database';
 import type { MCPToolResponse } from '@filing/shared';
 import { db } from '../lib/db.js';
@@ -153,8 +153,8 @@ const filingHistory: ToolFn = async (args) => {
   if (!projectName && !entityName && !filingId) return errorResponse('请提供 projectName、entityName 或 filingId');
 
   const conditions = [];
-  if (projectName) conditions.push(ilike(filings.projectName, `%${projectName}%`));
-  if (entityName) conditions.push(ilike(filings.legalEntityName, `%${entityName}%`));
+  if (projectName) conditions.push(like(filings.projectName, `%${projectName}%`));
+  if (entityName) conditions.push(like(filings.legalEntityName, `%${entityName}%`));
   if (filingId) conditions.push(eq(filings.id, filingId));
 
   const history = await db.select().from(filings).where(conditions.length > 0 ? and(...conditions) : undefined).orderBy(desc(filings.createdAt)).limit(50);

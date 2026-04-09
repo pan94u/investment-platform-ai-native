@@ -1,26 +1,12 @@
 {
   "version": "7",
-  "dialect": "postgresql",
+  "dialect": "mysql",
   "entries": [
     {
       "idx": 0,
-      "version": "7",
-      "when": 1773131248736,
-      "tag": "0000_panoramic_thanos",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1774857600000,
-      "tag": "0001_add_new_fields_and_tables",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1775260800000,
-      "tag": "0002_add_user_roles",
+      "version": "5",
+      "when": 1775688352819,
+      "tag": "0000_low_overlord",
       "breakpoints": true
     }
   ]

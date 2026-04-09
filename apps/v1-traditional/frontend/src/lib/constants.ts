@@ -9,18 +9,37 @@ export const FILING_TYPE_LABELS: Record<string, string> = {
 export const PROJECT_STAGE_LABELS: Record<string, string> = {
   invest: '新增投资',
   exit: '项目退出',
-  change: '变更',
-  other: '其它',
 };
 
-/** 每种项目类型允许的阶段 */
+/** 每种备案类型允许的阶段（只保留投/退） */
 export const TYPE_ALLOWED_STAGES: Record<string, string[]> = {
-  equity_direct: ['invest', 'change', 'exit'],
-  fund_project: ['invest', 'change'],
+  equity_direct: ['invest', 'exit'],
+  fund_project: ['invest', 'exit'],
   fund_investment: ['invest', 'exit'],
   legal_entity: ['invest'],
-  other: ['invest', 'change', 'exit', 'other'],
+  other: ['invest', 'exit'],
 };
+
+/** 项目类型标签（13 + 其他） */
+export const PROJECT_CATEGORY_LABELS: Record<string, string> = {
+  equity_direct_invest: '股权直投',
+  fund_new: '基金新设/出资',
+  fund_invest_project: '基金投项目',
+  new_park_factory: '新建园区/工厂',
+  land_asset: '土地资产投资',
+  legal_entity_wholly: '新设法人（全资）',
+  legal_entity_joint: '新设法人（合资）',
+  external_equity_financing: '对外股权融资',
+  investment_element_adjust: '投资要素调整',
+  internal_transaction: '内部交易类项目',
+  liquidation: '清算类项目',
+  asset_project: '资产类项目',
+  capital_increase: '增资类项目',
+  other_category: '其他',
+};
+
+/** 金额字段 tooltip */
+export const AMOUNT_TOOLTIP = '新增投资→填投资金额 / 项目退出→填退出金额 / 不涉及→填0';
 
 export const STATUS_LABELS: Record<string, string> = {
   draft: '草稿',

@@ -599,7 +599,7 @@ docker compose -f infrastructure/docker/docker-compose.v1.yml up -d
 | BUG-006 | getAttachments uploaderName null | ✅ |
 | BUG-007 | 项目联想无数据 | ✅ |
 | BUG-008 | KWG 上传认证 401 | ⏳ 等系统方 |
-| BUG-009 | 项目编号未带出 | ✅ 部分（投后有 projectCode，投前/退出用 id fallback） |
+| BUG-009 | 项目编号未带出 | ✅（投后用 projectCode，投前/退出用 id，确认正确） |
 | BUG-011 | submitFiling 查 users 表失败 | ✅ |
 | BUG-012 | /todos 路由 404，待办列表页面不存在 | ⏳ 待修复 |
 | BUG-013 | 审批节点配置允许重复添加同一个人 | ⏳ 待修复 |
@@ -864,3 +864,61 @@ socket → hang 到 30s AbortController 触发。
 - 下一步计划
 
 -->
+
+## 2026-04-09
+
+### Phase 1 (PG→MySQL) + Phase 2 (PM反馈) 交付
+
+#### Phase 1: PostgreSQL → MySQL 迁移完成
+
+**MySQL 不兼容修复**：
+- `ilike` → `like`（MySQL LIKE 默认大小写不敏感）
+- `::numeric` / `::text` cast → `CAST(... AS CHAR)`
+- `.returning()` → 拆成 insert + select
+- `drizzle-kit push` 会扫描整个共享库删 405 张旧表，**禁止使用**
+- 正确方式：生成 migration SQL 后直接执行 CREATE TABLE（只建 `inv_*` 表）
+
+**建表**：`packages/database/src/migrations/0000_low_overlord.sql` 生成 8 张 `inv_*` 表
+
+**Seed**：建表后执行 `seed-mysql.ts` 写入审批配置 + 邮件抄送配置 + admin 角色
+
+#### Phase 2: PM 表单反馈 — 6 项调整完成
+
+1. ✅ 字段顺序重排（上会备案逻辑：领域→行业→项目类型→项目名称→...）
+2. ✅ 项目阶段从 4 值缩减为 2 值（投/退，移除变更/其他）
+3. ✅ 新增「项目类型」下拉（14 选项：股权直投/基金新设/出资/.../其他）
+4. ✅ 金额字段加 tooltip（`新增投资→填投资金额 / 项目退出→填退出金额 / 不涉及→填0`）
+5. ✅ 移除：法人主体、投资比例、估值金额、原/新对赌目标、变更原因
+6. ✅ 新增只读字段：备案发起人（当前用户）、备案时间（提交后自动生成）
+
+**前端改动**：
+- `filings/new/page.tsx` — 表单重排 + projectCategory + amountTooltip
+- `filings/[id]/edit/page.tsx` — 同上
+- `filings/[id]/page.tsx` — 详情页重排 + 移除旧字段
+
+**邮件通知**：projectCategory 已在邮件主题+内容中显示
+
+#### E2E 验证（走完完整审批链）
+
+```
+BG20260409-002
+类型 fund_new（基金新设/出资）/ invest
+状态: draft → pending_business(L1-L3) → pending_group(finance+strategy) → pending_confirmation → completed
+邮件: 主题含项目类型、内容含「项目类型：基金新设/出资」
+备案时间: 自动生成
+```
+
+#### 统计快照
+
+| 指标 | 值 |
+|------|-----|
+| 文件数 | +3 (migration SQL, seed, create-tables)，-3 (PG migration) |
+| 代码行 | ~+100 / ~-50 net |
+| Bug 数 | 0 |
+| 测试 | E2E 通过 |
+
+#### 下一步
+
+1. ⏳ DBA 在生产库执行 migration SQL + seed
+2. ⏳ 测试环境公网域名确定后替换 `FEISHU_TODO_LINK_BASE`
+3. ⏳ 飞书审批流完整联调（卡片实际推送验证）

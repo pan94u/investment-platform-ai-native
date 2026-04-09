@@ -1,6 +1,6 @@
 import type { User } from './user.js';
 
-/** 备案一级场景（项目类型） */
+/** 备案一级场景（备案类型 — 步骤 0 卡片选择） */
 export type FilingType =
   | 'equity_direct'        // 股权直投
   | 'fund_project'         // 基金投项目
@@ -8,12 +8,27 @@ export type FilingType =
   | 'legal_entity'         // 法人新设
   | 'other';               // 其它
 
+/** 项目类型（13 个值，下拉单选） */
+export type ProjectCategory =
+  | 'equity_direct_invest'          // 股权直投
+  | 'fund_new'                      // 基金新设/出资
+  | 'fund_invest_project'           // 基金投项目
+  | 'new_park_factory'              // 新建园区/工厂
+  | 'land_asset'                    // 土地资产投资
+  | 'legal_entity_wholly'           // 新设法人（全资）
+  | 'legal_entity_joint'            // 新设法人（合资）
+  | 'external_equity_financing'     // 对外股权融资
+  | 'investment_element_adjust'     // 投资要素调整
+  | 'internal_transaction'          // 内部交易类项目
+  | 'liquidation'                   // 清算类项目
+  | 'asset_project'                 // 资产类项目
+  | 'capital_increase'              // 增资类项目
+  | 'other_category';               // 其他
+
 /** 项目阶段 */
 export type ProjectStage =
   | 'invest'               // 新增投资 / 新设
-  | 'exit'                 // 退出
-  | 'change'               // 变更（对赌变更等）
-  | 'other';               // 其它
+  | 'exit';                // 退出
 
 /** 备案状态 */
 export type FilingStatus =
@@ -45,6 +60,7 @@ export interface Filing {
   readonly filingNumber: string;          // BG 编号, e.g. BG20260301-005
   readonly type: FilingType;
   readonly projectStage: ProjectStage;
+  readonly projectCategory: ProjectCategory | null;  // 项目类型
   readonly title: string;                 // 项目说明（一句话摘要）
   readonly description: string;           // 备案具体事项
 
@@ -58,23 +74,23 @@ export interface Filing {
   readonly amount: number;                // 万元
   readonly currency: string;              // CNY
 
-  // 直投专有字段
-  readonly investmentRatio: number | null;    // 投资比例 %
-  readonly valuationAmount: number | null;    // 估值金额（万元）
+  // 直投专有字段（保留兼容旧数据，前端不再渲染）
+  readonly investmentRatio: number | null;
+  readonly valuationAmount: number | null;
 
-  // 对赌变更专有字段
-  readonly originalTarget: number | null;     // 原对赌目标（万元）
-  readonly newTarget: number | null;          // 新对赌目标（万元）
-  readonly changeReason: string | null;       // 变更原因
+  // 对赌变更专有字段（保留兼容旧数据，前端不再渲染）
+  readonly originalTarget: number | null;
+  readonly newTarget: number | null;
+  readonly changeReason: string | null;
 
   // 流程相关
-  readonly approvalGroups: readonly ApprovalGroupName[];   // 发起人勾选的审批组
-  readonly emailRecipients: readonly string[];             // 备案邮件业务收件人（userId[]）
-  readonly confirmedBy: string | null;                     // 最终确认人 userId
+  readonly approvalGroups: readonly ApprovalGroupName[];
+  readonly emailRecipients: readonly string[];
+  readonly confirmedBy: string | null;
 
   // 状态
   readonly status: FilingStatus;
-  readonly riskLevel: RiskLevel | null;       // V3+ 风险评估
+  readonly riskLevel: RiskLevel | null;
 
   // 项目编号
   readonly projectCode: string | null;
@@ -95,6 +111,7 @@ export interface Filing {
 export interface CreateFilingRequest {
   readonly type: FilingType;
   readonly projectStage: ProjectStage;
+  readonly projectCategory?: ProjectCategory;
   readonly title: string;
   readonly description: string;
   readonly projectName: string;

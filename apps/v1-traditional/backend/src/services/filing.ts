@@ -1,4 +1,4 @@
-import { eq, and, ilike, gte, lte, sql, desc, count } from 'drizzle-orm';
+import { eq, and, like, gte, lte, sql, desc, count } from 'drizzle-orm';
 import { filings, approvals } from '@filing/database';
 import { getEmployeeByCode } from './org-query.js';
 import type { CreateFilingRequest, UpdateFilingRequest, FilingQueryParams, ApprovalGroupName } from '@filing/shared';
@@ -22,7 +22,7 @@ async function getNextSeq(): Promise<number> {
   const result = await db
     .select({ cnt: count() })
     .from(filings)
-    .where(ilike(filings.filingNumber, `${datePrefix}%`));
+    .where(like(filings.filingNumber, `${datePrefix}%`));
   return (result[0]?.cnt ?? 0) + 1;
 }
 
@@ -35,11 +35,12 @@ export async function createFiling(data: CreateFilingRequest, creatorId: string,
   // 项目编号: 前端传入 or 自动生成 YYYY-MM-DD-NNN
   const projectCode = data.projectCode ?? generateProjectCode();
 
-  const [filing] = await db.insert(filings).values({
+  await db.insert(filings).values({
     id,
     filingNumber,
     type: data.type,
     projectStage: data.projectStage ?? 'invest',
+    projectCategory: data.projectCategory ?? null,
     title: data.title,
     description: data.description,
     projectName: data.projectName,
@@ -58,7 +59,8 @@ export async function createFiling(data: CreateFilingRequest, creatorId: string,
     projectCode,
     status: 'draft',
     creatorId,
-  }).returning();
+  });
+  const [filing] = await db.select().from(filings).where(eq(filings.id, id)).limit(1);
 
   await auditService.logAudit({
     action: 'filing_created',
@@ -82,6 +84,7 @@ export async function updateFiling(id: string, data: UpdateFilingRequest, userId
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
   if (data.type !== undefined) updateData.type = data.type;
   if (data.projectStage !== undefined) updateData.projectStage = data.projectStage;
+  if (data.projectCategory !== undefined) updateData.projectCategory = data.projectCategory ?? null;
   if (data.title !== undefined) updateData.title = data.title;
   if (data.description !== undefined) updateData.description = data.description;
   if (data.projectName !== undefined) updateData.projectName = data.projectName;
@@ -99,7 +102,8 @@ export async function updateFiling(id: string, data: UpdateFilingRequest, userId
   if (data.emailRecipients !== undefined) updateData.emailRecipients = data.emailRecipients;
   if (data.projectCode !== undefined) updateData.projectCode = data.projectCode;
 
-  const [updated] = await db.update(filings).set(updateData).where(eq(filings.id, id)).returning();
+  await db.update(filings).set(updateData).where(eq(filings.id, id));
+  const [updated] = await db.select().from(filings).where(eq(filings.id, id)).limit(1);
 
   await auditService.logAudit({
     action: 'filing_updated',
@@ -160,7 +164,7 @@ export async function queryFilings(params: FilingQueryParams) {
   if (params.dateTo) conditions.push(lte(filings.createdAt, new Date(params.dateTo)));
   if (params.keyword) {
     conditions.push(
-      sql`(${filings.title} ILIKE ${'%' + params.keyword + '%'} OR ${filings.projectName} ILIKE ${'%' + params.keyword + '%'} OR ${filings.filingNumber} ILIKE ${'%' + params.keyword + '%'})`
+      sql`(${filings.title} LIKE ${'%' + params.keyword + '%'} OR ${filings.projectName} LIKE ${'%' + params.keyword + '%'} OR ${filings.filingNumber} LIKE ${'%' + params.keyword + '%'})`
     );
   }
 
@@ -242,11 +246,11 @@ export async function submitFiling(filingId: string, user: { id: string; name: s
   }
 
   // 更新备案状态
-  const [updated] = await db
+  await db
     .update(filings)
     .set({ status: 'pending_business', submittedAt: now, updatedAt: now })
-    .where(eq(filings.id, filingId))
-    .returning();
+    .where(eq(filings.id, filingId));
+  const [updated] = await db.select().from(filings).where(eq(filings.id, filingId)).limit(1);
 
   await auditService.logAudit({
     action: 'filing_submitted',
@@ -301,11 +305,11 @@ export async function recallFiling(filingId: string, userId: string, userName: s
   }
 
   // 撤回到草稿状态（发起人可重新编辑提交），审批记录保留
-  const [updated] = await db
+  await db
     .update(filings)
     .set({ status: 'draft', submittedAt: null, updatedAt: now })
-    .where(eq(filings.id, filingId))
-    .returning();
+    .where(eq(filings.id, filingId));
+  const [updated] = await db.select().from(filings).where(eq(filings.id, filingId)).limit(1);
 
   await auditService.logAudit({
     action: 'filing_recalled',
@@ -336,7 +340,7 @@ export async function getDashboardStats() {
     .groupBy(filings.domain);
 
   const totalAmount = await db
-    .select({ total: sql<string>`COALESCE(SUM(${filings.amount}::numeric), 0)::text` })
+    .select({ total: sql<string>`CAST(COALESCE(SUM(${filings.amount}), 0) AS CHAR)` })
     .from(filings);
 
   return {

@@ -1,4 +1,4 @@
-import type { FilingType, ProjectStage, ApprovalGroupName } from '../types/filing.js';
+import type { FilingType, ProjectStage, ProjectCategory, ApprovalGroupName } from '../types/filing.js';
 
 /** 备案场景定义（5 类一级场景） */
 export const FILING_TYPE_CONFIG: Record<FilingType, {
@@ -9,12 +9,12 @@ export const FILING_TYPE_CONFIG: Record<FilingType, {
   equity_direct: {
     label: '股权直投',
     description: '直接股权投资项目备案',
-    allowedStages: ['invest', 'change', 'exit'],
+    allowedStages: ['invest', 'exit'],
   },
   fund_project: {
     label: '基金投项目',
     description: '通过基金投资的具体项目备案',
-    allowedStages: ['invest', 'change'],
+    allowedStages: ['invest', 'exit'],
   },
   fund_investment: {
     label: '基金投资',
@@ -29,13 +29,13 @@ export const FILING_TYPE_CONFIG: Record<FilingType, {
   other: {
     label: '其它',
     description: '内部股权交易、土地/园区等其他备案',
-    allowedStages: ['invest', 'change', 'exit', 'other'],
+    allowedStages: ['invest', 'exit'],
   },
 } as const;
 
 export const FILING_TYPES = Object.keys(FILING_TYPE_CONFIG) as readonly FilingType[];
 
-/** 项目阶段定义 */
+/** 项目阶段定义（只保留投/退） */
 export const PROJECT_STAGE_CONFIG: Record<ProjectStage, {
   readonly label: string;
   readonly amountHint: string;
@@ -48,17 +48,31 @@ export const PROJECT_STAGE_CONFIG: Record<ProjectStage, {
     label: '项目退出',
     amountHint: '请填写退出金额',
   },
-  change: {
-    label: '变更',
-    amountHint: '请填写变更金额',
-  },
-  other: {
-    label: '其它',
-    amountHint: '不涉及金额请填 0',
-  },
 } as const;
 
 export const PROJECT_STAGES = Object.keys(PROJECT_STAGE_CONFIG) as readonly ProjectStage[];
+
+/** 项目类型定义（13 类 + 其他） */
+export const PROJECT_CATEGORY_CONFIG: Record<ProjectCategory, {
+  readonly label: string;
+}> = {
+  equity_direct_invest: { label: '股权直投' },
+  fund_new: { label: '基金新设/出资' },
+  fund_invest_project: { label: '基金投项目' },
+  new_park_factory: { label: '新建园区/工厂' },
+  land_asset: { label: '土地资产投资' },
+  legal_entity_wholly: { label: '新设法人（全资）' },
+  legal_entity_joint: { label: '新设法人（合资）' },
+  external_equity_financing: { label: '对外股权融资' },
+  investment_element_adjust: { label: '投资要素调整' },
+  internal_transaction: { label: '内部交易类项目' },
+  liquidation: { label: '清算类项目' },
+  asset_project: { label: '资产类项目' },
+  capital_increase: { label: '增资类项目' },
+  other_category: { label: '其他' },
+} as const;
+
+export const PROJECT_CATEGORIES = Object.keys(PROJECT_CATEGORY_CONFIG) as readonly ProjectCategory[];
 
 /** 集团审批组定义 */
 export const APPROVAL_GROUP_CONFIG: Record<ApprovalGroupName, {
