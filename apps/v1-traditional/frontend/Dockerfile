@@ -15,7 +15,6 @@ COPY apps/v1-traditional/frontend/package.json ./apps/v1-traditional/frontend/pa
 COPY apps/v1-traditional/backend/package.json ./apps/v1-traditional/backend/package.json
 
 # @haier 私有包需要认证，CI/CD 平台需通过 build args 注入
-# 示例: docker build --build-arg NPM_HAIER_TOKEN=xxx .
 ARG NPM_HAIER_TOKEN
 RUN if [ -n "$NPM_HAIER_TOKEN" ]; then \
       echo "//npm.haier.net/:_authToken=${NPM_HAIER_TOKEN}" >> /root/.npmrc; \
@@ -31,18 +30,24 @@ COPY packages/ui ./packages/ui
 COPY apps/v1-traditional/frontend ./apps/v1-traditional/frontend
 COPY apps/v1-traditional/backend ./apps/v1-traditional/backend
 
-# 构建时注入 API URL（容器网络里后端叫 backend）
 ENV NEXT_PUBLIC_API_URL=http://backend:3101
 RUN pnpm --filter @filing/shared build && pnpm --filter @filing/v1-frontend build
 
-FROM node:20-alpine AS runner
+# 将构建产物复制到独立的输出目录，避免跨 stage COPY cache key 问题
+RUN mkdir -p /output && \
+    cp -r apps/v1-traditional/frontend/.next/standalone /output/frontend-standalone && \
+    cp -r apps/v1-traditional/frontend/.next/static /output/frontend-static && \
+    cp -r apps/v1-traditional/frontend/public /output/frontend-public && \
+    ls /output/
+
+FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3100
 
-COPY --from=builder /app/apps/v1-traditional/frontend/.next/standalone ./apps/v1-traditional/frontend/
-COPY --from=builder /app/apps/v1-traditional/frontend/.next/static ./apps/v1-traditional/frontend/.next/static
-COPY --from=builder /app/apps/v1-traditional/frontend/public ./apps/v1-traditional/frontend/public
+COPY --from=builder /output/frontend-standalone ./apps/v1-traditional/frontend/
+COPY --from=builder /output/frontend-static ./apps/v1-traditional/frontend/.next/static
+COPY --from=builder /output/frontend-public ./apps/v1-traditional/frontend/public
 
 EXPOSE 3100
 CMD ["node", "apps/v1-traditional/frontend/server.js"]
