@@ -43,7 +43,9 @@ COPY --from=builder /app/packages/database/package.json ./packages/database/pack
 COPY --from=builder /app/apps/v1-traditional/backend/dist ./apps/v1-traditional/backend/dist
 COPY --from=builder /app/apps/v1-traditional/backend/package.json ./apps/v1-traditional/backend/package.json
 
-# 显式复制 backend 的 node_modules（包含 @hono/node-server 等运行时依赖）
+# 显式复制 workspace 包的 node_modules（pnpm workspace 依赖安装在各自包目录下）
+COPY --from=builder /app/packages/shared/node_modules ./packages/shared/node_modules
+COPY --from=builder /app/packages/database/node_modules ./packages/database/node_modules
 COPY --from=builder /app/apps/v1-traditional/backend/node_modules ./apps/v1-traditional/backend/node_modules
 
 EXPOSE 3101
