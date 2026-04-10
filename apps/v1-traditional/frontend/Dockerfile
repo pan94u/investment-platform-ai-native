@@ -23,6 +23,9 @@ RUN if [ -n "$NPM_HAIER_TOKEN" ]; then \
 
 FROM base AS builder
 WORKDIR /app
+
+# 强制 builder 重跑的 cache buster，CI 每次构建时传入 --build-arg BUILD_DATE=$(date +%s)
+ARG BUILD_DATE
 COPY --from=deps /app/ ./
 COPY packages/shared ./packages/shared
 COPY packages/database ./packages/database
