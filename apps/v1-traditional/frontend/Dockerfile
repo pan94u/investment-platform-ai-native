@@ -31,13 +31,6 @@ ENV NEXT_PUBLIC_API_URL=http://backend:3101
 RUN pnpm --filter @filing/shared build && \
     pnpm --filter @filing/v1-frontend build
 
-# 验证构建产物
-RUN echo "=== standalone 内容 ===" && \
-    ls /app/apps/v1-traditional/frontend/.next/standalone/ && \
-    echo "=== server.js ===" && \
-    ls /app/apps/v1-traditional/frontend/.next/standalone/server.js && \
-    echo "=== 全部 OK ==="
-
 ENV NODE_ENV=production
 ENV PORT=3100
 
