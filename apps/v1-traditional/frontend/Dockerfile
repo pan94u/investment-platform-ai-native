@@ -36,12 +36,16 @@ COPY apps/v1-traditional/backend ./apps/v1-traditional/backend
 ENV NEXT_PUBLIC_API_URL=http://backend:3101
 RUN pnpm --filter @filing/shared build && pnpm --filter @filing/v1-frontend build
 
-# 将构建产物复制到独立的输出目录，避免跨 stage COPY cache key 问题
+# 将构建产物复制到独立的输出目录
+# standalone 内部结构：apps/v1-traditional/frontend/server.js + node_modules/ + package.json
+# 直接从 standalone 内部取出 apps/v1-traditional/frontend/ 这一层
 RUN mkdir -p /output && \
-    cp -r apps/v1-traditional/frontend/.next/standalone /output/frontend-standalone && \
-    cp -r apps/v1-traditional/frontend/.next/static /output/frontend-static && \
-    cp -r apps/v1-traditional/frontend/public /output/frontend-public && \
-    ls /output/
+    cp -r apps/v1-traditional/frontend/.next/standalone/apps/v1-traditional/frontend /output/frontend-standalone/ && \
+    cp -r apps/v1-traditional/frontend/.next/standalone/node_modules /output/frontend-standalone/ && \
+    cp -r apps/v1-traditional/frontend/.next/standalone/package.json /output/frontend-standalone/ && \
+    cp -r apps/v1-traditional/frontend/.next/static/ /output/frontend-static/ && \
+    cp -r apps/v1-traditional/frontend/public/ /output/frontend-public/ && \
+    ls /output/frontend-standalone/
 
 FROM base AS runner
 WORKDIR /app
