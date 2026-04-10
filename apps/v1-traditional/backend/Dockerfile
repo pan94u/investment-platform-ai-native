@@ -31,8 +31,9 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# 运行时环境变量（由 CI/CD 平台注入，或替换下方默认值）
-COPY apps/v1-traditional/backend/.env.production ./.env.production
+# 环境变量文件选择：CI/CD 通过 --build-arg ENV_TARGET=test|production
+ARG ENV_TARGET=production
+COPY apps/v1-traditional/backend/.env.${ENV_TARGET} ./.env.production
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist

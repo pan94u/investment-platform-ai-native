@@ -26,8 +26,11 @@ RUN if [ -n "$NPM_HAIER_TOKEN" ]; then \
 # 安装依赖
 RUN pnpm install --frozen-lockfile
 
+# 环境变量选择：CI/CD 通过 --build-arg ENV_TARGET=test|production
+ARG ENV_TARGET=production
+COPY apps/v1-traditional/frontend/.env.${ENV_TARGET} .env.local
+
 # 构建
-ENV NEXT_PUBLIC_API_URL=http://backend:3101
 RUN pnpm --filter @filing/shared build && \
     pnpm --filter @filing/v1-frontend build
 
