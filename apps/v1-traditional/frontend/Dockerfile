@@ -39,5 +39,5 @@ ENV PORT=3100
 
 EXPOSE 3100
 
-# 启动命令
-CMD ["node", "apps/v1-traditional/frontend/server.js"]
+# 启动命令：Next.js standalone 产物位于 .next/standalone/apps/v1-traditional/frontend/
+CMD ["node", "apps/v1-traditional/frontend/.next/standalone/apps/v1-traditional/frontend/server.js"]

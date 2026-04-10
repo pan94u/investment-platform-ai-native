@@ -43,5 +43,8 @@ COPY --from=builder /app/packages/database/package.json ./packages/database/pack
 COPY --from=builder /app/apps/v1-traditional/backend/dist ./apps/v1-traditional/backend/dist
 COPY --from=builder /app/apps/v1-traditional/backend/package.json ./apps/v1-traditional/backend/package.json
 
+# 显式复制 backend 的 node_modules（包含 @hono/node-server 等运行时依赖）
+COPY --from=builder /app/apps/v1-traditional/backend/node_modules ./apps/v1-traditional/backend/node_modules
+
 EXPOSE 3101
 CMD ["node", "--env-file=.env.production", "apps/v1-traditional/backend/dist/index.js"]
